@@ -1,0 +1,77 @@
+{
+  "name": "vscode-code-assistant-pro",
+  "displayName": "Code Assistant Pro",
+  "description": "Advanced VS Code code-generation assistant that returns production-ready code with implementation steps.",
+  "version": "0.0.2",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:codeAssistant.generateCode",
+    "onCommand:codeAssistant.setApiKey"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codeAssistant.generateCode",
+        "title": "Code Assistant: Generate Working Code"
+      },
+      {
+        "command": "codeAssistant.setApiKey",
+        "title": "Code Assistant: Set API Key"
+      }
+    ],
+    "configuration": {
+      "title": "Code Assistant",
+      "properties": {
+        "codeAssistant.endpoint": {
+          "type": "string",
+          "default": "https://api.openai.com/v1/chat/completions",
+          "description": "OpenAI-compatible chat completions endpoint."
+        },
+        "codeAssistant.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Fallback API key used only when Secret Storage is empty. Prefer the Set API Key command."
+        },
+        "codeAssistant.model": {
+          "type": "string",
+          "default": "gpt-5.1",
+          "description": "Model name used for code generation."
+        },
+        "codeAssistant.temperature": {
+          "type": "number",
+          "default": 0.2,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Sampling temperature; lower values increase determinism."
+        },
+        "codeAssistant.maxTokens": {
+          "type": "number",
+          "default": 1800,
+          "minimum": 200,
+          "maximum": 8192,
+          "description": "Maximum completion tokens."
+        },
+        "codeAssistant.timeoutMs": {
+          "type": "number",
+          "default": 60000,
+          "minimum": 5000,
+          "maximum": 300000,
+          "description": "Request timeout in milliseconds."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "lint": "node --check extension.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0"
+  }
+}
