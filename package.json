@@ -12,7 +12,8 @@
   ],
   "activationEvents": [
     "onCommand:codeAssistant.generateCode",
-    "onCommand:codeAssistant.setApiKey"
+    "onCommand:codeAssistant.setApiKey",
+    "onCommand:codeAssistant.hailMaryBuild"
   ],
   "main": "./extension.js",
   "contributes": {
@@ -24,6 +25,10 @@
       {
         "command": "codeAssistant.setApiKey",
         "title": "Code Assistant: Set API Key"
+      },
+      {
+        "command": "codeAssistant.hailMaryBuild",
+        "title": "Code Assistant: Hail Mary AI Build"
       }
     ],
     "configuration": {
@@ -37,7 +42,7 @@
         "codeAssistant.apiKey": {
           "type": "string",
           "default": "",
-          "description": "Fallback API key used only when Secret Storage is empty. Prefer the Set API Key command."
+          "description": "Optional API key. Leave empty for local/self-hosted endpoints that do not require bearer auth."
         },
         "codeAssistant.model": {
           "type": "string",
@@ -64,6 +69,26 @@
           "minimum": 5000,
           "maximum": 300000,
           "description": "Request timeout in milliseconds."
+        },
+        "codeAssistant.hailMaryMaxAttempts": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 8,
+          "description": "Maximum retries when validating Hail Mary JSON output."
+        },
+        "codeAssistant.mcpTools": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional list of available MCP/tool names passed to Hail Mary prompting."
+        },
+        "codeAssistant.enableCodeCheck": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run a local syntax checker on generated JavaScript/TypeScript before returning results."
         }
       }
     }
