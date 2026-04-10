@@ -1,5 +1,7 @@
 # Main Memory (Persistent Session Resume)
 
+> Startup rule: for every new chat in this repo, open `CHAT_BOOTSTRAP.md` first, then this file, then `NARRATIVE_ANCHORS.md`.
+
 This file is the persistent quick-start memory for future sessions.
 Use it first, then open `NARRATIVE_ANCHORS.md` for full canon detail.
 
