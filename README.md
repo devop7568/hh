@@ -95,6 +95,7 @@ craft-agent run "Build a roadmap for onboarding automation" --provider ollama --
 ```
 
 
+
 ## Build a standalone executable (.exe)
 
 You can package the CLI into a single executable with **PyInstaller** (free/open-source):
