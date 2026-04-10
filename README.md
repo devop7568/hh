@@ -38,3 +38,14 @@ Code Assistant Pro is a Visual Studio Code extension that generates practical, r
 
 - The extension requests JSON output from the model and validates the shape before inserting code.
 - If there is no active editor, it creates a new untitled file automatically.
+
+
+## Narrative memory bootstrap (project-wide)
+
+For any future chat/session in this repository, initialize narrative context by loading:
+
+1. `CHAT_BOOTSTRAP.md`
+2. `MAIN_MEMORY.md`
+3. `NARRATIVE_ANCHORS.md`
+
+This establishes persistent canon continuity across chats within this repo.
