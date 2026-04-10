@@ -94,6 +94,25 @@ ollama pull llama3.1:8b
 craft-agent run "Build a roadmap for onboarding automation" --provider ollama --model llama3.1:8b
 ```
 
+
+
+## Build a standalone executable (.exe)
+
+You can package the CLI into a single executable with **PyInstaller** (free/open-source):
+
+```bash
+pip install -e .[build-exe]
+python scripts/build_exe.py
+```
+
+- On **Windows**, output is `dist/craft-agent.exe`
+- On Linux/macOS, output is `dist/craft-agent`
+
+Run the built binary:
+```bash
+./dist/craft-agent run "Create a launch checklist" --provider stub
+```
+
 ## Optional web API
 
 ```bash

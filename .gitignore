@@ -1,3 +1,15 @@
 node_modules
 .vscode-test
 *.vsix
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Build artifacts
+build/
+dist/
+*.spec
+.agent_data/
