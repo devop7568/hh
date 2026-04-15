@@ -1,0 +1,48 @@
+{
+  "dataset": "Trinity Prompt Fusion",
+  "version": "1.0.0",
+  "examples": [
+    {
+      "category": "backend-api",
+      "prompt": "Build a secure REST API endpoint for user onboarding with validation and observability.",
+      "strategy": "Define schema first, enforce auth boundaries, and include structured logging + failure modes.",
+      "tags": ["api", "auth", "validation", "logging", "backend"],
+      "quality_markers": ["input validation", "error taxonomy", "unit tests", "metrics"]
+    },
+    {
+      "category": "frontend-ui",
+      "prompt": "Create a responsive dashboard with loading states, empty states, and accessible controls.",
+      "strategy": "Start with component contract, then states matrix, then keyboard-first accessibility checks.",
+      "tags": ["frontend", "dashboard", "accessibility", "state", "ux"],
+      "quality_markers": ["aria coverage", "skeleton loading", "state handling"]
+    },
+    {
+      "category": "agent-orchestration",
+      "prompt": "Design an autonomous multi-agent pipeline to research, draft, and verify a market brief.",
+      "strategy": "Use a planner-executor-reflection loop with confidence scores and escalation criteria.",
+      "tags": ["agent", "planning", "evaluation", "automation", "workflow"],
+      "quality_markers": ["checkpointing", "quality gates", "audit trail"]
+    },
+    {
+      "category": "mlops",
+      "prompt": "Implement a model deployment workflow with rollback and offline evaluation safeguards.",
+      "strategy": "Specify artifacts, validation thresholds, deployment stages, and rollback triggers.",
+      "tags": ["mlops", "deployment", "evaluation", "rollback", "monitoring"],
+      "quality_markers": ["drift checks", "canary", "rollback policy"]
+    },
+    {
+      "category": "product-strategy",
+      "prompt": "Draft a product roadmap for launching a B2B AI assistant in 90 days.",
+      "strategy": "Connect user jobs-to-be-done with phased milestones, risks, and outcome metrics.",
+      "tags": ["product", "roadmap", "metrics", "gtm", "strategy"],
+      "quality_markers": ["KPIs", "risks", "discovery experiments"]
+    },
+    {
+      "category": "devops",
+      "prompt": "Set up CI/CD for a Node and Python monorepo with lint, tests, and deployment protections.",
+      "strategy": "Use pipeline matrix builds, quality gates, artifact caching, and release approvals.",
+      "tags": ["cicd", "devops", "node", "python", "testing"],
+      "quality_markers": ["cache strategy", "branch protections", "artifact integrity"]
+    }
+  ]
+}

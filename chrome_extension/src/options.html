@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prompting Pro Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="app">
+      <h1>Prompting Pro Settings</h1>
+
+      <label for="defaultProfile">Default profile</label>
+      <select id="defaultProfile">
+        <option value="lucario">Lucario OP Fusion</option>
+        <option value="trinity">Trinity Fusion</option>
+        <option value="promptcraft">PromptCraft</option>
+        <option value="juma">Juma</option>
+        <option value="openmanus">OpenManus</option>
+      </select>
+
+      <label for="defaultOutputType">Default output type</label>
+      <select id="defaultOutputType">
+        <option value="prompt">Enhanced Prompt</option>
+        <option value="code">Production Code</option>
+        <option value="agent">Agent Workflow</option>
+        <option value="strategy">Strategy Plan</option>
+      </select>
+
+      <label for="constraints">Global constraints (one per line)</label>
+      <textarea id="constraints" rows="8" placeholder="Always include edge cases\nPrefer secure defaults\nReturn structured JSON"></textarea>
+
+      <div class="buttons">
+        <button id="save">Save</button>
+        <button id="train" class="secondary">Run Training</button>
+      </div>
+
+      <section class="panel">
+        <h2>State</h2>
+        <pre id="stateView">Loading...</pre>
+      </section>
+
+      <p id="status"></p>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

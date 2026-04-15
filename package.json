@@ -1,7 +1,7 @@
 {
   "name": "vscode-code-assistant-pro",
-  "displayName": "Code Assistant Pro",
-  "description": "Advanced VS Code code-generation assistant that returns production-ready code with implementation steps.",
+  "displayName": "Prompting Pro",
+  "description": "Prompting Pro core engine + Chrome extension for Lucario/Trinity tri-model prompt enhancement.",
   "version": "0.0.2",
   "publisher": "local",
   "engines": {
@@ -12,7 +12,10 @@
   ],
   "activationEvents": [
     "onCommand:codeAssistant.generateCode",
-    "onCommand:codeAssistant.setApiKey"
+    "onCommand:codeAssistant.setApiKey",
+    "onCommand:codeAssistant.enhancePrompt",
+    "onCommand:codeAssistant.showTrainingDataReport",
+    "onCommand:codeAssistant.trainPromptEnhancer"
   ],
   "main": "./extension.js",
   "contributes": {
@@ -24,6 +27,18 @@
       {
         "command": "codeAssistant.setApiKey",
         "title": "Code Assistant: Set API Key"
+      },
+      {
+        "command": "codeAssistant.enhancePrompt",
+        "title": "Code Assistant: Enhance Prompt (Trinity Fusion)"
+      },
+      {
+        "command": "codeAssistant.showTrainingDataReport",
+        "title": "Code Assistant: Show Training Data Report"
+      },
+      {
+        "command": "codeAssistant.trainPromptEnhancer",
+        "title": "Code Assistant: Train Prompt Enhancer (Lucario)"
       }
     ],
     "configuration": {
@@ -64,6 +79,30 @@
           "minimum": 5000,
           "maximum": 300000,
           "description": "Request timeout in milliseconds."
+        },
+        "codeAssistant.includeWorkspaceContext": {
+          "type": "boolean",
+          "default": true,
+          "description": "When enabled, include active file and selection context in prompt enhancement."
+        },
+        "codeAssistant.trainingExamplesLimit": {
+          "type": "number",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Maximum number of training examples injected into enhanced prompts."
+        },
+        "codeAssistant.defaultFusionProfile": {
+          "type": "string",
+          "default": "lucario",
+          "enum": [
+            "lucario",
+            "trinity",
+            "promptcraft",
+            "juma",
+            "openmanus"
+          ],
+          "description": "Default fusion profile shown to users when enhancing prompts."
         }
       }
     }
