@@ -1,534 +1,376 @@
-/* PromptForge AI - Popup Script */
+/* PromptForge AI - Popup Logic */
 
 (function () {
   'use strict';
 
-  /* ── Utilities ── */
+  var _q = function(s) { return document.querySelector(s); };
+  var _qa = function(s) { return document.querySelectorAll(s); };
 
-  function $(sel) { return document.querySelector(sel); }
-  function $$(sel) { return document.querySelectorAll(sel); }
-
+  /* -- Toast -- */
   function showToast(msg, type) {
-    const toast = $('#toast');
-    toast.textContent = msg;
-    toast.className = 'toast visible ' + (type || '');
-    clearTimeout(toast._timer);
-    toast._timer = setTimeout(() => { toast.className = 'toast hidden'; }, 2200);
+    var t = _q('#toast');
+    t.textContent = msg;
+    t.className = 'toast ' + (type || 'success');
+    clearTimeout(t._tid);
+    t._tid = setTimeout(function() { t.className = 'toast hidden'; }, 3000);
   }
+
+  /* -- Clipboard & Insert -- */
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+      showToast('Copied to clipboard!', 'success');
+    }).catch(function() {
+      showToast('Copy failed', 'error');
+    });
+  }
+
+  function insertIntoChat(text) {
+    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+      if (!tabs[0]) return;
+      chrome.scripting.executeScript({
+        target: { tabId: tabs[0].id },
+        func: function(prompt) {
+          var selectors = [
+            'textarea[data-id="root"]',
+            'div.ProseMirror[contenteditable]',
+            'textarea#prompt-textarea',
+            'div[contenteditable="true"]',
+            'textarea'
+          ];
+          for (var i = 0; i < selectors.length; i++) {
+            var el = document.querySelector(selectors[i]);
+            if (el) {
+              if (el.tagName === 'TEXTAREA') {
+                el.value = prompt;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+              } else {
+                el.innerText = prompt;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+              }
+              el.focus();
+              return;
+            }
+          }
+        },
+        args: [text]
+      });
+      showToast('Inserted into chat!', 'success');
+    });
+  }
+
+  /* -- Send message to background -- */
+  function sendBg(action, data) {
+    return new Promise(function(resolve) {
+      chrome.runtime.sendMessage({ action: action, data: data }, function(response) {
+        if (chrome.runtime.lastError) {
+          console.warn('sendBg error:', chrome.runtime.lastError.message);
+          resolve(undefined);
+        } else {
+          resolve(response);
+        }
+      });
+    });
+  }
+
+  /* -- Settings -- */
+  function openSettings() {
+    chrome.runtime.openOptionsPage();
+  }
+
+  _q('#btn-settings').addEventListener('click', openSettings);
+
+  /* -- API Key Status -- */
+  function checkApiKeyStatus() {
+    chrome.storage.local.get('settings', function(result) {
+      var data = result.settings;
+      var hasKey = data && data.apiKey && data.apiKey.trim();
+      _q('#api-warning').classList.toggle('hidden', !!hasKey);
+    });
+  }
+
+  checkApiKeyStatus();
+
+  _q('#setup-link').addEventListener('click', function(e) {
+    e.preventDefault();
+    openSettings();
+  });
+
+  chrome.storage.onChanged.addListener(function(changes) {
+    if (changes.settings) checkApiKeyStatus();
+  });
+
+  /* -- Tabs -- */
+  _qa('.tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      _qa('.tab').forEach(function(t) { t.classList.remove('active'); });
+      _qa('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+      tab.classList.add('active');
+      var target = tab.dataset.tab;
+      document.querySelector('[data-content="' + target + '"]').classList.add('active');
+
+      if (target === 'history') loadHistory();
+      if (target === 'library') loadLibrary();
+    });
+  });
+
+  /* -- Char count -- */
+  _q('#raw-prompt').addEventListener('input', function() {
+    _q('#char-count').textContent = _q('#raw-prompt').value.length;
+  });
+
+  /* -- Mode cards -- */
+  _qa('.mode-card').forEach(function(card) {
+    card.addEventListener('click', function() {
+      _qa('.mode-card').forEach(function(c) { c.classList.remove('active'); });
+      card.classList.add('active');
+    });
+  });
+
+  /* -- Generate -- */
+  var lastResult = null;
 
   function setLoading(on, text) {
-    const el = $('#loading');
-    if (on) {
-      el.querySelector('span').textContent = text || 'Optimizing with AI...';
-      el.classList.remove('hidden');
-    } else {
-      el.classList.add('hidden');
-    }
+    _q('#loading').classList.toggle('hidden', !on);
+    if (text) _q('#loading-text').textContent = text;
+    _q('#btn-generate').disabled = on;
   }
 
-  function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(() => {
-      showToast('Copied to clipboard!', 'success');
-    }).catch(() => {
-      showToast('Failed to copy', 'error');
-    });
-  }
+  _q('#btn-generate').addEventListener('click', generate);
+  _q('#btn-regenerate').addEventListener('click', generate);
 
-  async function insertIntoChat(text) {
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab) { showToast('No active tab found', 'error'); return; }
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ['content.js']
-      }).catch(() => { /* may already be injected */ });
-      chrome.tabs.sendMessage(tab.id, { action: 'insertPrompt', text }, (response) => {
-        if (chrome.runtime.lastError || !response?.success) {
-          showToast('Could not insert — open an AI chat first', 'error');
-        } else {
-          showToast('Inserted into chat!', 'success');
-        }
-      });
-    } catch {
-      showToast('Could not insert — open an AI chat first', 'error');
-    }
-  }
-
-  function sendBg(action, data) {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action, data }, resolve);
-    });
-  }
-
-  /* ── Tab Navigation ── */
-
-  $$('.tab').forEach((tab) => {
-    tab.addEventListener('click', () => {
-      $$('.tab').forEach((t) => t.classList.remove('active'));
-      $$('.tab-content').forEach((c) => c.classList.remove('active'));
-      tab.classList.add('active');
-      $(`#tab-${tab.dataset.tab}`).classList.add('active');
-    });
-  });
-
-  /* ── Settings ── */
-
-  $('#btn-settings').addEventListener('click', () => {
-    chrome.runtime.openOptionsPage();
-  });
-
-  /* ══════════════════════════════════════
-     TAB 1: OPTIMIZER
-     ══════════════════════════════════════ */
-
-  $('#btn-optimize').addEventListener('click', async () => {
-    const raw = $('#raw-prompt').value.trim();
+  function generate() {
+    var raw = _q('#raw-prompt').value.trim();
     if (!raw) { showToast('Enter a prompt first', 'error'); return; }
 
-    const mode = document.querySelector('input[name="opt-mode"]:checked').value;
+    var mode = document.querySelector('input[name="gen-mode"]:checked').value;
+    var isDeep = mode === 'deep';
 
-    setLoading(true, 'Optimizing with AI...');
-    $('#btn-optimize').disabled = true;
+    setLoading(true, isDeep ? 'Deep engineering (2 passes)...' : 'Engineering your prompt...');
+    _q('#result').classList.add('hidden');
 
-    try {
-      const result = await sendBg('optimizePrompt', { rawPrompt: raw, mode });
-
-      if (result.error) {
-        showToast(result.error, 'error');
-        return;
-      }
-
-      const resultArea = $('#optimizer-result');
-      resultArea.classList.remove('hidden');
-
-      $('#optimized-text').textContent = result.optimized || '';
-
-      if (result.score?.before) {
-        $('#score-before').textContent = result.score.before;
-        $('#score-after').textContent = result.score.after;
-      }
-
-      if (result.breakdown && Object.keys(result.breakdown).length) {
-        $('#craft-breakdown').classList.remove('hidden');
-        $('#bd-context').textContent = result.breakdown.context || '—';
-        $('#bd-role').textContent = result.breakdown.role || '—';
-        $('#bd-action').textContent = result.breakdown.action || '—';
-        $('#bd-format').textContent = result.breakdown.format || '—';
-        $('#bd-tone').textContent = result.breakdown.tone || '—';
-      }
-
-      if (result.improvements?.length) {
-        $('#improvements-list').classList.remove('hidden');
-        const ul = $('#improvements-ul');
-        ul.innerHTML = '';
-        result.improvements.forEach((imp) => {
-          const li = document.createElement('li');
-          li.textContent = imp;
-          ul.appendChild(li);
-        });
-      }
-
-      window._lastOptimized = result.optimized || '';
-    } catch (err) {
-      showToast(err.message || 'Optimization failed', 'error');
-    } finally {
+    var action = isDeep ? 'deepOptimize' : 'optimizePrompt';
+    sendBg(action, { rawPrompt: raw, mode: mode }).then(function(result) {
       setLoading(false);
-      $('#btn-optimize').disabled = false;
-    }
-  });
 
-  $('#btn-copy-optimized').addEventListener('click', () => {
-    if (window._lastOptimized) copyToClipboard(window._lastOptimized);
-  });
-
-  $('#btn-insert-optimized').addEventListener('click', () => {
-    if (window._lastOptimized) insertIntoChat(window._lastOptimized);
-  });
-
-  $('#btn-save-optimized').addEventListener('click', async () => {
-    if (!window._lastOptimized) return;
-    await sendBg('saveToLibrary', {
-      title: window._lastOptimized.slice(0, 60),
-      prompt: window._lastOptimized,
-      source: 'optimizer',
-      tags: ['optimized']
-    });
-    showToast('Saved to library!', 'success');
-  });
-
-  /* ══════════════════════════════════════
-     TAB 2: CRAFT BUILDER
-     ══════════════════════════════════════ */
-
-  const TEMPLATES = [
-    { name: 'Blog Post', context: 'Writing for a company blog targeting professionals', role: 'Act as an experienced content strategist and writer', action: 'Write a well-structured blog post on the given topic', format: 'Markdown with headings, bullet points, and a conclusion', tone: 'Professional' },
-    { name: 'Code Review', context: 'Reviewing code for a production application', role: 'Act as a senior software engineer with 10+ years of experience', action: 'Review the provided code and suggest improvements', format: 'Numbered list of issues with code examples for fixes', tone: 'Technical' },
-    { name: 'Email Draft', context: 'Business communication with a client or stakeholder', role: 'Act as a professional business communicator', action: 'Draft an email based on the given requirements', format: 'Standard email format with subject line, greeting, body, and sign-off', tone: 'Professional' },
-    { name: 'Research', context: 'Conducting analysis on a specific topic', role: 'Act as a research analyst with domain expertise', action: 'Analyze the topic and provide comprehensive findings', format: 'Structured report with executive summary, key findings, and recommendations', tone: 'Academic' },
-    { name: 'Marketing', context: 'Creating marketing content for product promotion', role: 'Act as a creative marketing strategist', action: 'Create compelling marketing copy for the given product or service', format: 'Multiple variations with headlines, body copy, and call-to-action', tone: 'Persuasive' }
-  ];
-
-  function renderTemplateChips() {
-    const container = document.createElement('div');
-    container.className = 'templates-row';
-    TEMPLATES.forEach((tmpl) => {
-      const chip = document.createElement('button');
-      chip.className = 'template-chip';
-      chip.textContent = tmpl.name;
-      chip.addEventListener('click', () => {
-        $('#craft-context').value = tmpl.context;
-        $('#craft-role').value = tmpl.role;
-        $('#craft-action').value = tmpl.action;
-        $('#craft-format').value = tmpl.format;
-        $('#craft-tone').value = tmpl.tone;
-      });
-      container.appendChild(chip);
-    });
-    const builderTab = $('#tab-builder');
-    builderTab.insertBefore(container, builderTab.querySelector('.form-group'));
-  }
-  renderTemplateChips();
-
-  $('#btn-build-craft').addEventListener('click', () => {
-    const ctx = $('#craft-context').value.trim();
-    const role = $('#craft-role').value.trim();
-    const action = $('#craft-action').value.trim();
-    const fmt = $('#craft-format').value.trim();
-    const tone = $('#craft-tone').value;
-
-    if (!action) { showToast('At least fill in the Action field', 'error'); return; }
-
-    const parts = [];
-    if (role) parts.push(role + '.');
-    if (ctx) parts.push('\n\nContext: ' + ctx);
-    parts.push('\n\nTask: ' + action);
-    if (fmt) parts.push('\n\nFormat: ' + fmt);
-    if (tone) parts.push('\n\nTone: ' + tone);
-
-    const built = parts.join('');
-    window._lastBuilt = built;
-
-    $('#built-text').textContent = built;
-    $('#builder-result').classList.remove('hidden');
-  });
-
-  $('#btn-copy-built').addEventListener('click', () => {
-    if (window._lastBuilt) copyToClipboard(window._lastBuilt);
-  });
-
-  $('#btn-insert-built').addEventListener('click', () => {
-    if (window._lastBuilt) insertIntoChat(window._lastBuilt);
-  });
-
-  $('#btn-save-built').addEventListener('click', async () => {
-    if (!window._lastBuilt) return;
-    await sendBg('saveToLibrary', {
-      title: window._lastBuilt.slice(0, 60),
-      prompt: window._lastBuilt,
-      source: 'builder',
-      tags: ['craft']
-    });
-    showToast('Saved to library!', 'success');
-  });
-
-  /* ══════════════════════════════════════
-     TAB 3: GUIDED MODE (Juma-style)
-     ══════════════════════════════════════ */
-
-  let guidedStep = 'start';
-  let guidedAnswers = {};
-
-  function renderGuidedQuestions(questions) {
-    const container = $('#guided-questions');
-    container.innerHTML = '';
-
-    questions.forEach((q) => {
-      const group = document.createElement('div');
-      group.className = 'form-group';
-
-      const label = document.createElement('label');
-      label.textContent = q.label;
-      label.setAttribute('for', 'guided-' + q.id);
-      group.appendChild(label);
-
-      if (q.type === 'textarea') {
-        const ta = document.createElement('textarea');
-        ta.id = 'guided-' + q.id;
-        ta.rows = 2;
-        ta.placeholder = q.placeholder || '';
-        ta.dataset.qid = q.id;
-        group.appendChild(ta);
-      } else if (q.type === 'select' && q.options) {
-        const sel = document.createElement('select');
-        sel.id = 'guided-' + q.id;
-        sel.dataset.qid = q.id;
-        const defOpt = document.createElement('option');
-        defOpt.value = '';
-        defOpt.textContent = q.placeholder || 'Select...';
-        sel.appendChild(defOpt);
-        q.options.forEach((opt) => {
-          const o = document.createElement('option');
-          o.value = opt;
-          o.textContent = opt;
-          sel.appendChild(o);
-        });
-        group.appendChild(sel);
-      } else {
-        const inp = document.createElement('input');
-        inp.type = 'text';
-        inp.id = 'guided-' + q.id;
-        inp.placeholder = q.placeholder || '';
-        inp.dataset.qid = q.id;
-        group.appendChild(inp);
-      }
-
-      container.appendChild(group);
-    });
-  }
-
-  function collectGuidedAnswers() {
-    const inputs = $$('#guided-questions [data-qid]');
-    inputs.forEach((el) => {
-      const val = el.value.trim();
-      if (val) guidedAnswers[el.dataset.qid] = val;
-    });
-  }
-
-  function updateStepIndicator(step) {
-    const stepMap = { start: 1, basic: 2, details: 3 };
-    const current = stepMap[step] || 1;
-    $$('.step-dot').forEach((dot) => {
-      const s = parseInt(dot.dataset.step, 10);
-      dot.classList.remove('active', 'completed');
-      if (s < current) dot.classList.add('completed');
-      if (s === current) dot.classList.add('active');
-    });
-    $$('.step-line').forEach((line, i) => {
-      line.classList.toggle('active', i < current - 1);
-    });
-  }
-
-  async function startGuided() {
-    guidedStep = 'start';
-    guidedAnswers = {};
-    $('#guided-result').classList.add('hidden');
-    $('#guided-container').classList.remove('hidden');
-    updateStepIndicator('start');
-
-    const result = await sendBg('guidedBuild', { step: 'start', answers: {} });
-    guidedStep = result.step;
-    updateStepIndicator(guidedStep);
-    renderGuidedQuestions(result.questions);
-    $('#btn-guided-next').textContent = 'Next Step';
-  }
-
-  startGuided();
-
-  $('#btn-guided-next').addEventListener('click', async () => {
-    collectGuidedAnswers();
-
-    if (guidedStep === 'basic') {
-      updateStepIndicator('details');
-      setLoading(true, 'Building your prompt...');
-    }
-
-    try {
-      const result = await sendBg('guidedBuild', { step: guidedStep, answers: guidedAnswers });
-
-      if (result.error) {
-        showToast(result.error, 'error');
+      if (!result || result.error) {
+        showToast((result && result.error) || 'Service unavailable', 'error');
         return;
       }
 
-      if (result.step === 'complete') {
-        $('#guided-container').classList.add('hidden');
-        const resultArea = $('#guided-result');
-        resultArea.classList.remove('hidden');
+      lastResult = result;
+      displayResult(result);
+    }).catch(function(err) {
+      setLoading(false);
+      showToast(err.message || 'Generation failed', 'error');
+    });
+  }
 
-        window._lastGuided = result.prompt || '';
-        $('#guided-text').textContent = result.prompt || '';
+  function displayResult(result) {
+    _q('#result').classList.remove('hidden');
+    _q('#result-text').textContent = result.optimized || '';
+    _q('#result-mode').textContent = result.mode || 'quick';
+    _q('#result-type').textContent = result.taskType || '';
 
-        if (result.tips?.length) {
-          $('#guided-tips').classList.remove('hidden');
-          const ul = $('#guided-tips-ul');
-          ul.innerHTML = '';
-          result.tips.forEach((tip) => {
-            const li = document.createElement('li');
-            li.textContent = tip;
-            ul.appendChild(li);
+    if (result.techniques) {
+      _q('#techniques-used').classList.remove('hidden');
+      _q('#techniques-text').textContent = result.techniques;
+    } else {
+      _q('#techniques-used').classList.add('hidden');
+    }
+  }
+
+  /* -- Result Actions -- */
+  _q('#btn-copy').addEventListener('click', function() {
+    if (lastResult) copyToClipboard(lastResult.optimized);
+  });
+
+  _q('#btn-insert').addEventListener('click', function() {
+    if (lastResult) insertIntoChat(lastResult.optimized);
+  });
+
+  _q('#btn-save').addEventListener('click', function() {
+    if (!lastResult) return;
+    sendBg('saveToLibrary', {
+      title: lastResult.optimized.slice(0, 80),
+      prompt: lastResult.optimized,
+      source: lastResult.mode || 'quick',
+      tags: [lastResult.taskType || 'general']
+    }).then(function() {
+      showToast('Saved to library!', 'success');
+    });
+  });
+
+  /* -- History -- */
+  function loadHistory() {
+    var container = _q('#history-list');
+    sendBg('getHistory').then(function(items) {
+      items = items || [];
+
+      if (!items.length) {
+        container.innerHTML = '<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><p>No history yet.</p><p class="hint">Generate a prompt to see it here.</p></div>';
+        return;
+      }
+
+      container.innerHTML = '';
+      items.forEach(function(item) {
+        var div = document.createElement('div');
+        div.className = 'list-item';
+
+        var header = document.createElement('div');
+        header.className = 'list-item-header';
+
+        var title = document.createElement('div');
+        title.className = 'list-item-title';
+        title.textContent = item.input || '';
+
+        var actions = document.createElement('div');
+        actions.className = 'list-item-actions';
+
+        var copyBtn = document.createElement('button');
+        copyBtn.title = 'Copy';
+        copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+        copyBtn.addEventListener('click', function() { copyToClipboard(item.output); });
+        actions.appendChild(copyBtn);
+
+        header.appendChild(title);
+        header.appendChild(actions);
+
+        var preview = document.createElement('div');
+        preview.className = 'list-item-preview';
+        preview.textContent = item.output || '';
+
+        var meta = document.createElement('div');
+        meta.className = 'list-item-meta';
+        meta.innerHTML = '<span class="list-item-tag">' + escapeHtml(item.mode || 'quick') + '</span><span>' + escapeHtml(item.taskType || '') + '</span><span>' + timeAgo(item.createdAt) + '</span>';
+
+        div.appendChild(header);
+        div.appendChild(preview);
+        div.appendChild(meta);
+        container.appendChild(div);
+      });
+    });
+  }
+
+  /* -- Library -- */
+  var currentFilter = 'all';
+
+  function loadLibrary() {
+    var container = _q('#library-list');
+    sendBg('getLibrary').then(function(items) {
+      items = items || [];
+      var search = (_q('#library-search').value || '').toLowerCase().trim();
+
+      var filtered = items;
+      if (currentFilter === 'favorites') {
+        filtered = filtered.filter(function(i) { return i.favorite; });
+      }
+      if (search) {
+        filtered = filtered.filter(function(i) {
+          return (i.title || '').toLowerCase().indexOf(search) !== -1 ||
+                 (i.prompt || '').toLowerCase().indexOf(search) !== -1;
+        });
+      }
+
+      if (!filtered.length) {
+        container.innerHTML = '<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><p>No saved prompts yet.</p><p class="hint">Generate and save prompts to build your library.</p></div>';
+        return;
+      }
+
+      container.innerHTML = '';
+      filtered.forEach(function(item) {
+        var div = document.createElement('div');
+        div.className = 'list-item';
+
+        var header = document.createElement('div');
+        header.className = 'list-item-header';
+
+        var title = document.createElement('div');
+        title.className = 'list-item-title';
+        title.textContent = item.title || '';
+
+        var actions = document.createElement('div');
+        actions.className = 'list-item-actions';
+
+        var favBtn = document.createElement('button');
+        favBtn.title = 'Toggle favorite';
+        favBtn.className = item.favorite ? 'favorited' : '';
+        favBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="' + (item.favorite ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+        favBtn.addEventListener('click', function() {
+          sendBg('toggleFavorite', { id: item.id }).then(function() { loadLibrary(); });
+        });
+        actions.appendChild(favBtn);
+
+        var copyBtn = document.createElement('button');
+        copyBtn.title = 'Copy';
+        copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+        copyBtn.addEventListener('click', function() { copyToClipboard(item.prompt); });
+        actions.appendChild(copyBtn);
+
+        var insertBtn = document.createElement('button');
+        insertBtn.title = 'Insert into chat';
+        insertBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+        insertBtn.addEventListener('click', function() { insertIntoChat(item.prompt); });
+        actions.appendChild(insertBtn);
+
+        var delBtn = document.createElement('button');
+        delBtn.title = 'Delete';
+        delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+        delBtn.addEventListener('click', function() {
+          sendBg('deleteFromLibrary', { id: item.id }).then(function() {
+            showToast('Deleted', 'success');
+            loadLibrary();
           });
-        }
-      } else {
-        guidedStep = result.step;
-        updateStepIndicator(guidedStep);
-        renderGuidedQuestions(result.questions);
+        });
+        actions.appendChild(delBtn);
 
-        if (guidedStep === 'details') {
-          const btn = $('#btn-guided-next');
-          btn.innerHTML = 'Generate Prompt <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
-        }
-      }
-    } catch (err) {
-      showToast(err.message || 'Failed', 'error');
-    } finally {
-      setLoading(false);
-    }
-  });
+        header.appendChild(title);
+        header.appendChild(actions);
 
-  $('#btn-copy-guided').addEventListener('click', () => {
-    if (window._lastGuided) copyToClipboard(window._lastGuided);
-  });
+        var preview = document.createElement('div');
+        preview.className = 'list-item-preview';
+        preview.textContent = item.prompt || '';
 
-  $('#btn-insert-guided').addEventListener('click', () => {
-    if (window._lastGuided) insertIntoChat(window._lastGuided);
-  });
+        var meta = document.createElement('div');
+        meta.className = 'list-item-meta';
+        meta.innerHTML = '<span class="list-item-tag">' + escapeHtml(item.source || 'manual') + '</span><span>' + timeAgo(item.createdAt) + '</span>';
 
-  $('#btn-save-guided').addEventListener('click', async () => {
-    if (!window._lastGuided) return;
-    await sendBg('saveToLibrary', {
-      title: window._lastGuided.slice(0, 60),
-      prompt: window._lastGuided,
-      source: 'guided',
-      tags: ['guided']
-    });
-    showToast('Saved to library!', 'success');
-  });
-
-  $('#btn-guided-restart').addEventListener('click', () => {
-    startGuided();
-  });
-
-  /* ══════════════════════════════════════
-     TAB 4: LIBRARY
-     ══════════════════════════════════════ */
-
-  let currentFilter = 'all';
-
-  function renderLibrary(items) {
-    const container = $('#library-list');
-
-    if (!items.length) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          <p>No saved prompts yet.</p>
-          <p class="hint">Optimize or build a prompt, then save it here.</p>
-        </div>`;
-      return;
-    }
-
-    container.innerHTML = '';
-    items.forEach((item) => {
-      const div = document.createElement('div');
-      div.className = 'library-item';
-      div.innerHTML = `
-        <div class="library-item-header">
-          <div class="library-item-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
-          <div class="library-item-actions">
-            <button class="lib-fav ${item.favorite ? 'favorited' : ''}" data-id="${item.id}" title="Toggle favorite">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="${item.favorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-            </button>
-            <button class="lib-copy" data-prompt="${escapeAttr(item.prompt)}" title="Copy">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            </button>
-            <button class="lib-insert" data-prompt="${escapeAttr(item.prompt)}" title="Insert into chat">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            </button>
-            <button class="lib-delete" data-id="${item.id}" title="Delete">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
-          </div>
-        </div>
-        <div class="library-item-preview">${escapeHtml(item.prompt)}</div>
-        <div class="library-item-meta">
-          <span class="library-item-tag">${item.source || 'manual'}</span>
-          <span>${timeAgo(item.createdAt)}</span>
-        </div>`;
-      container.appendChild(div);
-    });
-
-    container.querySelectorAll('.lib-fav').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        await sendBg('toggleFavorite', { id: btn.dataset.id });
-        loadLibrary();
-      });
-    });
-
-    container.querySelectorAll('.lib-copy').forEach((btn) => {
-      btn.addEventListener('click', () => copyToClipboard(btn.dataset.prompt));
-    });
-
-    container.querySelectorAll('.lib-insert').forEach((btn) => {
-      btn.addEventListener('click', () => insertIntoChat(btn.dataset.prompt));
-    });
-
-    container.querySelectorAll('.lib-delete').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        await sendBg('deleteFromLibrary', { id: btn.dataset.id });
-        showToast('Deleted', 'success');
-        loadLibrary();
+        div.appendChild(header);
+        div.appendChild(preview);
+        div.appendChild(meta);
+        container.appendChild(div);
       });
     });
   }
 
-  async function loadLibrary() {
-    const items = await sendBg('getLibrary');
-    const search = $('#library-search').value.toLowerCase().trim();
-
-    let filtered = items || [];
-    if (currentFilter === 'favorites') {
-      filtered = filtered.filter((i) => i.favorite);
-    }
-    if (search) {
-      filtered = filtered.filter((i) =>
-        (i.title || '').toLowerCase().includes(search) ||
-        (i.prompt || '').toLowerCase().includes(search)
-      );
-    }
-    renderLibrary(filtered);
-  }
-
-  $$('.filter-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      $$('.filter-btn').forEach((b) => b.classList.remove('active'));
+  _qa('.filter-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      _qa('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
       currentFilter = btn.dataset.filter;
       loadLibrary();
     });
   });
 
-  $('#library-search').addEventListener('input', () => {
+  _q('#library-search').addEventListener('input', function() {
     loadLibrary();
   });
 
-  /* Load library when Library tab is clicked */
-  $$('.tab').forEach((tab) => {
-    tab.addEventListener('click', () => {
-      if (tab.dataset.tab === 'library') loadLibrary();
-    });
-  });
-
-  /* ── Helpers ── */
-
+  /* -- Helpers -- */
   function escapeHtml(str) {
-    const d = document.createElement('div');
+    var d = document.createElement('div');
     d.textContent = str || '';
     return d.innerHTML;
   }
 
-  function escapeAttr(str) {
-    return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
   function timeAgo(iso) {
     if (!iso) return '';
-    const diff = Date.now() - new Date(iso).getTime();
-    const mins = Math.floor(diff / 60000);
+    var diff = Date.now() - new Date(iso).getTime();
+    var mins = Math.floor(diff / 60000);
     if (mins < 1) return 'just now';
     if (mins < 60) return mins + 'm ago';
-    const hrs = Math.floor(mins / 60);
+    var hrs = Math.floor(mins / 60);
     if (hrs < 24) return hrs + 'h ago';
-    const days = Math.floor(hrs / 24);
+    var days = Math.floor(hrs / 24);
     return days + 'd ago';
   }
 })();
