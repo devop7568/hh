@@ -133,8 +133,8 @@
     try {
       const result = await sendBg('optimizePrompt', { rawPrompt: raw, mode });
 
-      if (result.error) {
-        showToast(result.error, 'error');
+      if (!result || result.error) {
+        showToast((result && result.error) || 'Service unavailable — try again', 'error');
         return;
       }
 
@@ -356,6 +356,7 @@
     updateStepIndicator('start');
 
     const result = await sendBg('guidedBuild', { step: 'start', answers: {} });
+    if (!result) return;
     guidedStep = result.step;
     updateStepIndicator(guidedStep);
     renderGuidedQuestions(result.questions);
@@ -375,8 +376,8 @@
     try {
       const result = await sendBg('guidedBuild', { step: guidedStep, answers: guidedAnswers });
 
-      if (result.error) {
-        showToast(result.error, 'error');
+      if (!result || result.error) {
+        showToast((result && result.error) || 'Service unavailable — try again', 'error');
         return;
       }
 
