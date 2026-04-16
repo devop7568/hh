@@ -56,7 +56,14 @@
 
   function sendBg(action, data) {
     return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action, data }, resolve);
+      chrome.runtime.sendMessage({ action, data }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn('sendBg error:', chrome.runtime.lastError.message);
+          resolve(undefined);
+        } else {
+          resolve(response);
+        }
+      });
     });
   }
 
@@ -73,8 +80,41 @@
 
   /* ── Settings ── */
 
-  $('#btn-settings').addEventListener('click', () => {
+  function openSettings() {
     chrome.runtime.openOptionsPage();
+  }
+
+  $('#btn-settings').addEventListener('click', openSettings);
+
+  const settingsBanner = $('#api-key-banner');
+  const btnOpenSettings = $('#btn-open-settings');
+  if (btnOpenSettings) {
+    btnOpenSettings.addEventListener('click', openSettings);
+  }
+
+  /* Check for API key on popup open */
+  function checkApiKeyStatus() {
+    chrome.storage.local.get('settings', (result) => {
+      const s = result.settings;
+      if (!s || !s.apiKey || !s.apiKey.trim()) {
+        settingsBanner.classList.remove('hidden');
+      } else {
+        settingsBanner.classList.add('hidden');
+      }
+    });
+  }
+  checkApiKeyStatus();
+
+  /* Listen for storage changes so banner updates if user saves key while popup is open */
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.settings) {
+      const newSettings = changes.settings.newValue;
+      if (newSettings && newSettings.apiKey && newSettings.apiKey.trim()) {
+        settingsBanner.classList.add('hidden');
+      } else {
+        settingsBanner.classList.remove('hidden');
+      }
+    }
   });
 
   /* ══════════════════════════════════════
@@ -93,8 +133,8 @@
     try {
       const result = await sendBg('optimizePrompt', { rawPrompt: raw, mode });
 
-      if (result.error) {
-        showToast(result.error, 'error');
+      if (!result || result.error) {
+        showToast((result && result.error) || 'Service unavailable — try again', 'error');
         return;
       }
 
@@ -316,6 +356,7 @@
     updateStepIndicator('start');
 
     const result = await sendBg('guidedBuild', { step: 'start', answers: {} });
+    if (!result) return;
     guidedStep = result.step;
     updateStepIndicator(guidedStep);
     renderGuidedQuestions(result.questions);
@@ -335,8 +376,8 @@
     try {
       const result = await sendBg('guidedBuild', { step: guidedStep, answers: guidedAnswers });
 
-      if (result.error) {
-        showToast(result.error, 'error');
+      if (!result || result.error) {
+        showToast((result && result.error) || 'Service unavailable — try again', 'error');
         return;
       }
 
