@@ -55,10 +55,10 @@
   }
 
   function sendBg(action, data) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       chrome.runtime.sendMessage({ action, data }, (response) => {
         if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
+          resolve({ error: chrome.runtime.lastError.message });
         } else {
           resolve(response);
         }
