@@ -55,8 +55,14 @@
   }
 
   function sendBg(action, data) {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action, data }, resolve);
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ action, data }, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(response);
+        }
+      });
     });
   }
 
@@ -73,8 +79,41 @@
 
   /* ── Settings ── */
 
-  $('#btn-settings').addEventListener('click', () => {
+  function openSettings() {
     chrome.runtime.openOptionsPage();
+  }
+
+  $('#btn-settings').addEventListener('click', openSettings);
+
+  const settingsBanner = $('#api-key-banner');
+  const btnOpenSettings = $('#btn-open-settings');
+  if (btnOpenSettings) {
+    btnOpenSettings.addEventListener('click', openSettings);
+  }
+
+  /* Check for API key on popup open */
+  function checkApiKeyStatus() {
+    chrome.storage.local.get('settings', (result) => {
+      const s = result.settings;
+      if (!s || !s.apiKey || !s.apiKey.trim()) {
+        settingsBanner.classList.remove('hidden');
+      } else {
+        settingsBanner.classList.add('hidden');
+      }
+    });
+  }
+  checkApiKeyStatus();
+
+  /* Listen for storage changes so banner updates if user saves key while popup is open */
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.settings) {
+      const newSettings = changes.settings.newValue;
+      if (newSettings && newSettings.apiKey && newSettings.apiKey.trim()) {
+        settingsBanner.classList.add('hidden');
+      } else {
+        settingsBanner.classList.remove('hidden');
+      }
+    }
   });
 
   /* ══════════════════════════════════════

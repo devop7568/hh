@@ -260,11 +260,18 @@
       </div>
     </div>
 
-    <button id="btn-save" class="btn-save">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-      Save Settings
-    </button>
+    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+      <button id="btn-save" class="btn-save">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save Settings
+      </button>
+      <button id="btn-test" class="btn-save" style="background: linear-gradient(135deg, #10b981, #059669);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        Test Connection
+      </button>
+    </div>
     <div id="status" class="status">Settings saved successfully!</div>
+    <div id="test-status" class="status"></div>
   </div>
 
   <script>
@@ -325,8 +332,8 @@
       if (s.maxTokens) document.getElementById('maxTokens').value = s.maxTokens;
     });
 
-    document.getElementById('btn-save').addEventListener('click', () => {
-      const settings = {
+    function gatherSettings() {
+      return {
         apiProvider: providerSelect.value,
         apiKey: document.getElementById('apiKey').value.trim(),
         endpoint: endpointInput.value.trim(),
@@ -334,11 +341,72 @@
         temperature: parseFloat(tempSlider.value),
         maxTokens: parseInt(document.getElementById('maxTokens').value, 10) || 2048
       };
+    }
+
+    document.getElementById('btn-save').addEventListener('click', () => {
+      const settings = gatherSettings();
 
       chrome.storage.local.set({ settings }, () => {
-        const status = document.getElementById('status');
-        status.classList.add('visible');
-        setTimeout(() => status.classList.remove('visible'), 2500);
+        // Verify the save by reading back
+        chrome.storage.local.get('settings', (result) => {
+          const status = document.getElementById('status');
+          if (result.settings && result.settings.apiKey === settings.apiKey) {
+            status.textContent = 'Settings saved successfully!';
+            status.style.color = 'var(--success)';
+          } else {
+            status.textContent = 'Warning: Settings may not have saved correctly. Please try again.';
+            status.style.color = 'var(--error)';
+          }
+          status.classList.add('visible');
+          setTimeout(() => status.classList.remove('visible'), 3000);
+        });
+      });
+    });
+
+    document.getElementById('btn-test').addEventListener('click', async () => {
+      const settings = gatherSettings();
+      const testStatus = document.getElementById('test-status');
+
+      if (!settings.apiKey) {
+        testStatus.textContent = 'Please enter an API key first.';
+        testStatus.style.color = 'var(--error)';
+        testStatus.classList.add('visible');
+        setTimeout(() => testStatus.classList.remove('visible'), 3000);
+        return;
+      }
+
+      // Save settings first so the background worker can use them
+      chrome.storage.local.set({ settings }, async () => {
+        testStatus.textContent = 'Testing connection...';
+        testStatus.style.color = 'var(--text-secondary)';
+        testStatus.classList.add('visible');
+
+        try {
+          const response = await new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage(
+              { action: 'optimizePrompt', data: { rawPrompt: 'Say hello in one word.', mode: 'quick' } },
+              (resp) => {
+                if (chrome.runtime.lastError) {
+                  reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                  resolve(resp);
+                }
+              }
+            );
+          });
+
+          if (response && response.error) {
+            testStatus.textContent = 'Connection failed: ' + response.error;
+            testStatus.style.color = 'var(--error)';
+          } else {
+            testStatus.textContent = 'Connection successful! API key is working.';
+            testStatus.style.color = 'var(--success)';
+          }
+        } catch (err) {
+          testStatus.textContent = 'Connection failed: ' + (err.message || 'Unknown error');
+          testStatus.style.color = 'var(--error)';
+        }
+        setTimeout(() => testStatus.classList.remove('visible'), 5000);
       });
     });
   </script>

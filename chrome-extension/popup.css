@@ -42,6 +42,37 @@ body::-webkit-scrollbar-track { background: transparent; }
 body::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 3px; }
 body::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
+/* API Key Banner */
+.api-key-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(245, 158, 11, 0.12);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.25);
+  color: var(--warning);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.api-key-banner.hidden { display: none; }
+
+.api-key-banner svg { flex-shrink: 0; }
+
+.banner-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  margin-left: auto;
+}
+
+.banner-link:hover { color: var(--accent-hover); }
+
 /* Header */
 .header {
   display: flex;

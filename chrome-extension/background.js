@@ -78,6 +78,17 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'checkSettings') {
+    chrome.storage.local.get('settings', (result) => {
+      const s = result.settings;
+      sendResponse({
+        hasApiKey: !!(s && s.apiKey && s.apiKey.trim()),
+        provider: s ? s.apiProvider : 'none'
+      });
+    });
+    return true;
+  }
+
   return false;
 });
 
