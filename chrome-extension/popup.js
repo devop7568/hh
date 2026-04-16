@@ -58,7 +58,8 @@
     return new Promise((resolve) => {
       chrome.runtime.sendMessage({ action, data }, (response) => {
         if (chrome.runtime.lastError) {
-          resolve({ error: chrome.runtime.lastError.message });
+          console.warn('sendBg error:', chrome.runtime.lastError.message);
+          resolve(undefined);
         } else {
           resolve(response);
         }
