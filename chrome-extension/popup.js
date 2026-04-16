@@ -27,34 +27,19 @@
   function insertIntoChat(text) {
     chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
       if (!tabs[0]) return;
+      // Ensure content script is injected, then message it
       chrome.scripting.executeScript({
         target: { tabId: tabs[0].id },
-        func: function(prompt) {
-          var selectors = [
-            'textarea[data-id="root"]',
-            'div.ProseMirror[contenteditable]',
-            'textarea#prompt-textarea',
-            'div[contenteditable="true"]',
-            'textarea'
-          ];
-          for (var i = 0; i < selectors.length; i++) {
-            var el = document.querySelector(selectors[i]);
-            if (el) {
-              if (el.tagName === 'TEXTAREA') {
-                el.value = prompt;
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-              } else {
-                el.innerText = prompt;
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-              }
-              el.focus();
-              return;
-            }
+        files: ['content.js']
+      }).catch(function() { /* may already be injected */ }).then(function() {
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'insertPrompt', text: text }, function(response) {
+          if (chrome.runtime.lastError || !response || !response.success) {
+            showToast('Could not insert — open an AI chat first', 'error');
+          } else {
+            showToast('Inserted into chat!', 'success');
           }
-        },
-        args: [text]
+        });
       });
-      showToast('Inserted into chat!', 'success');
     });
   }
 
