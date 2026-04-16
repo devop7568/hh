@@ -314,7 +314,7 @@ async function optimizePrompt(data) {
     { role: 'user', content: userMessage }
   ]);
 
-  saveToHistory(rawPrompt, content, mode || 'quick', taskInfo.primary);
+  saveToHistory(rawPrompt, content.trim(), mode || 'quick', taskInfo.primary);
 
   return {
     optimized: content.trim(),
