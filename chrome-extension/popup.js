@@ -152,13 +152,91 @@
 
   function displayResult(result) {
     _q('#result').classList.remove('hidden');
-    _q('#result-text').textContent = result.optimized || '';
+    var resultTextEl = _q('#result-text');
+
+    /* -- Turn-aware display -- */
+    var text = result.optimized || '';
+    var hasTurns = result.hasTurns || false;
+    var turnCount = result.turnCount || 0;
+
+    if (hasTurns && turnCount >= 2) {
+      /* Format with visual turn separators for easy reading */
+      resultTextEl.innerHTML = '';
+      var turnRegex = /===\s*TURN\s+(\d+)\s*[:\-]?\s*([^=]*?)\s*===/gi;
+      var parts = [];
+      var lastIndex = 0;
+      var match;
+      var turnMatches = [];
+
+      while ((match = turnRegex.exec(text)) !== null) {
+        turnMatches.push({
+          index: match.index,
+          end: match.index + match[0].length,
+          number: match[1],
+          label: match[2].trim() || ('Turn ' + match[1])
+        });
+      }
+
+      if (turnMatches.length >= 2) {
+        for (var i = 0; i < turnMatches.length; i++) {
+          var tm = turnMatches[i];
+          var contentStart = tm.end;
+          var contentEnd = (i + 1 < turnMatches.length) ? turnMatches[i + 1].index : text.length;
+          var turnContent = text.slice(contentStart, contentEnd).trim();
+
+          /* Remove separator chars between turns */
+          turnContent = turnContent.replace(/[\u2550]{10,}/g, '').trim();
+
+          if (i > 0) {
+            /* Big visual separator between turns */
+            var sep = document.createElement('div');
+            sep.className = 'turn-separator';
+            sep.innerHTML = '<div class="turn-separator-line"></div>';
+            resultTextEl.appendChild(sep);
+          }
+
+          /* Turn header */
+          var header = document.createElement('div');
+          header.className = 'turn-header';
+          header.textContent = 'TURN ' + tm.number + ': ' + tm.label;
+          resultTextEl.appendChild(header);
+
+          /* Turn content */
+          var contentDiv = document.createElement('div');
+          contentDiv.className = 'turn-content';
+          contentDiv.textContent = turnContent;
+          resultTextEl.appendChild(contentDiv);
+        }
+      } else {
+        /* Fallback: display as plain text */
+        resultTextEl.textContent = text;
+      }
+    } else {
+      /* Single prompt - display as plain text */
+      resultTextEl.textContent = text;
+    }
+
     _q('#result-mode').textContent = result.mode || 'quick';
     _q('#result-type').textContent = result.taskType || '';
 
+    /* Turn count badge */
+    if (hasTurns && turnCount >= 2) {
+      _q('#result-mode').textContent = (result.mode || 'quick') + ' \u2022 ' + turnCount + ' turns';
+    }
+
     if (result.techniques) {
       _q('#techniques-used').classList.remove('hidden');
-      _q('#techniques-text').textContent = result.techniques;
+      var techText = result.techniques;
+
+      /* Show psychological techniques for deep mode */
+      if (result.psychologicalTechniques && result.psychologicalTechniques.length) {
+        techText += '\n\nPsychological Techniques Applied:\n' + result.psychologicalTechniques.map(function(t) { return '\u2022 ' + t; }).join('\n');
+      }
+      if (result.additionalTechniques && result.additionalTechniques.length) {
+        techText += '\n\nAdditional Techniques:\n' + result.additionalTechniques.map(function(t) { return '\u2022 ' + t; }).join('\n');
+      }
+
+      _q('#techniques-text').textContent = techText;
     } else {
       _q('#techniques-used').classList.add('hidden');
     }
