@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prompting Pro</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="app">
+      <h1>Prompting Pro</h1>
+      <p class="subtitle">Lucario Trinity Prompt Fusion</p>
+
+      <label for="rawPrompt">Raw prompt</label>
+      <textarea id="rawPrompt" rows="7" placeholder="Paste your rough prompt here..."></textarea>
+
+      <div class="row">
+        <div>
+          <label for="profile">Profile</label>
+          <select id="profile">
+            <option value="lucario">Lucario OP Fusion</option>
+            <option value="trinity">Trinity Fusion</option>
+            <option value="promptcraft">PromptCraft</option>
+            <option value="juma">Juma</option>
+            <option value="openmanus">OpenManus</option>
+          </select>
+        </div>
+        <div>
+          <label for="outputType">Output Type</label>
+          <select id="outputType">
+            <option value="prompt">Enhanced Prompt</option>
+            <option value="code">Production Code</option>
+            <option value="agent">Agent Workflow</option>
+            <option value="strategy">Strategy Plan</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="buttons">
+        <button id="enhance">Enhance Prompt</button>
+        <button id="train" class="secondary">Train</button>
+      </div>
+
+      <label for="result">Enhanced result</label>
+      <textarea id="result" rows="12" readonly></textarea>
+
+      <div class="buttons">
+        <button id="copy" class="secondary">Copy</button>
+        <button id="openOptions" class="secondary">Options</button>
+      </div>
+
+      <p id="status"></p>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
