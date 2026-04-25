@@ -108,7 +108,8 @@
 
     chrome.runtime.sendMessage({ type: 'GET_KNOWLEDGE' }, function (resp) {
       try {
-        var enhanced = localEnhance(text);
+        var knowledge = (resp && resp.knowledge) || null;
+        var enhanced = localEnhance(text, knowledge);
         setInputValue(input, enhanced);
         showNotice('Enhanced! (' + text.split(/\s+/).length + ' \u2192 ' + enhanced.split(/\s+/).length + ' words)');
       } catch (e) {
@@ -119,8 +120,7 @@
     });
   }
 
-  function localEnhance(text) {
-    var words = text.trim().split(/\s+/);
+  function localEnhance(text, knowledge) {
     var enhanced = '';
 
     enhanced += 'You are an expert assistant. I need thorough, precise help with the following:\n\n';
@@ -138,6 +138,14 @@
     if (/\b(explain|research|what|how|why)\b/i.test(text)) {
       enhanced += '- Distinguish established facts from speculation\n';
       enhanced += '- Cite mechanisms and evidence where applicable\n';
+    }
+
+    if (knowledge && knowledge.techniques && knowledge.techniques.length > 0) {
+      var relevant = knowledge.techniques.slice(0, 3);
+      enhanced += '\nApply these prompting techniques:\n';
+      relevant.forEach(function (t) {
+        enhanced += '- ' + (t.name || t) + (t.description ? ': ' + t.description : '') + '\n';
+      });
     }
 
     enhanced += '\nProvide your best, most thorough response.';

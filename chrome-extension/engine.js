@@ -491,14 +491,22 @@ window.HailMaryEngine = (function () {
   function autoRoute(a) { return AUTO_ROUTES[a.task] || 'hailmary'; }
 
   // ─── MAIN ENHANCE ───────────────────────────────────────────────────────
-  function run(raw, mode, opts, k) {
+  function run(raw, mode, opts, k, precomputed) {
     if (!raw || !raw.trim()) throw new Error('Prompt cannot be empty');
-    var depth = Math.max(1, Math.min(5, parseInt(opts.depth, 10) || 4));
-    var t0 = Date.now();
-    var a = analyze(raw);
-    if (!session.firstFP) session.firstFP = a.fp;
-    boost(a.task);
-    var resolvedMode = mode === 'auto' ? autoRoute(a) : mode;
+    var depth, t0, a, resolvedMode;
+    if (precomputed) {
+      depth = precomputed.depth;
+      t0 = precomputed.t0;
+      a = precomputed.a;
+      resolvedMode = precomputed.resolvedMode;
+    } else {
+      depth = Math.max(1, Math.min(5, parseInt(opts.depth, 10) || 4));
+      t0 = Date.now();
+      a = analyze(raw);
+      if (!session.firstFP) session.firstFP = a.fp;
+      boost(a.task);
+      resolvedMode = mode === 'auto' ? autoRoute(a) : mode;
+    }
     var enhanced = buildPrompt(a, depth, resolvedMode, k);
 
     var techCount = enhanced.split('\n\n').filter(function (p) { return p.trim().length > 0; }).length;
@@ -635,12 +643,13 @@ window.HailMaryEngine = (function () {
             boost(a.task);
             var resolvedMode = mode === 'auto' ? autoRoute(a) : mode;
 
+            var pre = { depth: depth, t0: t0, a: a, resolvedMode: resolvedMode };
             if (typeof puter !== 'undefined' && puter.ai) {
               enhanceWithPuter(raw, a, depth, resolvedMode, opts || {}, k, t0)
                 .then(function (result) { record({ task: result.analysis.task, domains: result.analysis.domains, techniques: result.techniques }); resolve(result); })
-                .catch(function () { var result = run(raw, mode, opts || {}, k); record({ task: result.analysis.task, domains: result.analysis.domains, techniques: result.techniques }); resolve(result); });
+                .catch(function () { var result = run(raw, mode, opts || {}, k, pre); record({ task: result.analysis.task, domains: result.analysis.domains, techniques: result.techniques }); resolve(result); });
             } else {
-              var result = run(raw, mode, opts || {}, k);
+              var result = run(raw, mode, opts || {}, k, pre);
               record({ task: result.analysis.task, domains: result.analysis.domains, techniques: result.techniques });
               resolve(result);
             }

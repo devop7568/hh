@@ -16,7 +16,10 @@
     "nativeMessaging",
     "downloads",
     "cookies",
-    "contextMenus"
+    "contextMenus",
+    "notifications",
+    "bookmarks",
+    "history"
   ],
   "host_permissions": [
     "https://*/*",
