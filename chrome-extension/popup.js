@@ -1,534 +1,654 @@
-/* PromptForge AI - Popup Script */
-
+/**
+ * HailMary v6.0 — POPUP CONTROLLER
+ * Uses Core utilities — zero duplicated DOM/storage/clipboard helpers.
+ * Unified tool routing via executeTool — no more giant if/else chain.
+ */
 (function () {
   'use strict';
 
-  /* ── Utilities ── */
+  var C = window.HailMaryCore;
+  var el = C.el, show = C.show, hide = C.hide, esc = C.esc;
+  var toast = C.toast, copyText = C.copyText;
 
-  function $(sel) { return document.querySelector(sel); }
-  function $$(sel) { return document.querySelectorAll(sel); }
+  // ─── STATE ───────────────────────────────────────────────────────────────
+  var state = {
+    currentModel: 'gpt-5.2',
+    currentEnhanceMode: 'auto',
+    currentTool: null,
+    currentTurns: 8,
+    lastResult: null,
+    lastTurns: null,
+    chatBusy: false,
+    MAX_HIST: 30
+  };
 
-  function showToast(msg, type) {
-    const toast = $('#toast');
-    toast.textContent = msg;
-    toast.className = 'toast visible ' + (type || '');
-    clearTimeout(toast._timer);
-    toast._timer = setTimeout(() => { toast.className = 'toast hidden'; }, 2200);
+  var DEPTH_LABELS = ['Basic', 'Standard', 'Advanced', 'Expert', 'Maximum'];
+
+  var FIRE_LABELS = {
+    hailmary: '\u2604\ufe0f HAIL MARY ACTIVATED',
+    manus: '\u{1f9e0} MANUS ORCHESTRATION',
+    juma: '\u26a1 JUMA MULTI-PERSPECTIVE',
+    openmanus: '\u{1f6e0}\ufe0f OPENMANUS REACT AGENT',
+    auto: '\u{1f916} AUTO-ROUTED'
+  };
+
+  // ─── TOOL INPUT DEFINITIONS ──────────────────────────────────────────────
+  var TOOL_INPUTS = {
+    browser_navigate: [{ name: 'url', placeholder: 'URL to navigate to', type: 'text' }, { name: 'newTab', placeholder: 'Open in new tab? (true/false)', type: 'text' }],
+    click: [{ name: 'selector', placeholder: 'CSS selector', type: 'text' }],
+    fill_form: [{ name: 'fields', placeholder: '{"#email":"test@x.com","#pass":"123"}', type: 'textarea' }],
+    extract_data: [{ name: 'config', placeholder: '{"text":true,"links":true,"title":true}', type: 'textarea' }],
+    dom_query: [{ name: 'selector', placeholder: 'CSS selector', type: 'text' }, { name: 'limit', placeholder: 'Max results (default 50)', type: 'text' }],
+    input_simulate: [{ name: 'selector', placeholder: 'CSS selector', type: 'text' }, { name: 'text', placeholder: 'Text to type', type: 'text' }],
+    script_inject: [{ name: 'code', placeholder: 'return document.title;', type: 'textarea' }],
+    shell_exec: [{ name: 'command', placeholder: 'ls -la', type: 'text' }, { name: 'cwd', placeholder: 'Working directory (optional)', type: 'text' }],
+    file_read: [{ name: 'path', placeholder: '/path/to/file', type: 'text' }],
+    file_write: [{ name: 'path', placeholder: '/path/to/file', type: 'text' }, { name: 'content', placeholder: 'Content to write', type: 'textarea' }],
+    web_search: [{ name: 'query', placeholder: 'Search query', type: 'text' }, { name: 'limit', placeholder: 'Max results (default 8)', type: 'text' }],
+    api_call: [{ name: 'url', placeholder: 'API URL', type: 'text' }, { name: 'method', placeholder: 'GET/POST/PUT/DELETE', type: 'text' }, { name: 'body', placeholder: 'Request body JSON (optional)', type: 'textarea' }],
+    download_file: [{ name: 'url', placeholder: 'File URL', type: 'text' }, { name: 'filename', placeholder: 'Save as (optional)', type: 'text' }],
+    storage_read: [{ name: 'keys', placeholder: 'Key name(s)', type: 'text' }],
+    storage_write: [{ name: 'data', placeholder: '{"key":"value"}', type: 'textarea' }],
+    cookie_read: [{ name: 'url', placeholder: 'URL', type: 'text' }, { name: 'name', placeholder: 'Cookie name (optional)', type: 'text' }],
+    cookie_write: [{ name: 'details', placeholder: '{"url":"...","name":"...","value":"..."}', type: 'textarea' }],
+    clipboard_access: [{ name: 'action', placeholder: 'read or write', type: 'text' }, { name: 'text', placeholder: 'Text to write (if write)', type: 'text' }],
+    screenshot: [],
+    page_wait: [{ name: 'ms', placeholder: 'Milliseconds to wait', type: 'text' }],
+    tab_manage: [{ name: 'action', placeholder: 'list/close/focus/create', type: 'text' }, { name: 'tabId', placeholder: 'Tab ID (optional)', type: 'text' }],
+    element_modify: [{ name: 'selector', placeholder: 'CSS selector', type: 'text' }, { name: 'modifications', placeholder: '{"text":"new text"}', type: 'textarea' }],
+    style_modify: [{ name: 'selector', placeholder: 'CSS selector', type: 'text' }, { name: 'styles', placeholder: '{"color":"red","display":"none"}', type: 'textarea' }],
+    event_dispatch: [{ name: 'selector', placeholder: 'CSS selector', type: 'text' }, { name: 'eventType', placeholder: 'click/mouseover/keydown', type: 'text' }]
+  };
+
+  // ─── INIT ────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function () {
+    setupPanelTabs();
+    setupModelSelector();
+    setupChat();
+    setupEnhancePanel();
+    setupToolsPanel();
+    setupTurnsPanel();
+    setupSettingsPanel();
+    setupHistory();
+    setupKeyboardShortcuts();
+    loadSettings();
+    checkTab();
+    loadContextMenuText();
+    updateToolCount();
+  });
+
+  // ─── PANEL TABS ──────────────────────────────────────────────────────────
+  function setupPanelTabs() {
+    document.querySelectorAll('.tab-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
+        document.querySelectorAll('.panel').forEach(function (p) { p.style.display = 'none'; p.classList.remove('active'); });
+        btn.classList.add('active');
+        btn.setAttribute('aria-selected', 'true');
+        var panel = el(btn.dataset.panel);
+        if (panel) { panel.style.display = ''; panel.classList.add('active'); }
+      });
+    });
   }
 
-  function setLoading(on, text) {
-    const el = $('#loading');
-    if (on) {
-      el.querySelector('span').textContent = text || 'Optimizing with AI...';
-      el.classList.remove('hidden');
+  // ─── KEYBOARD SHORTCUTS ──────────────────────────────────────────────────
+  function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', function (e) {
+      if (e.ctrlKey && e.key >= '1' && e.key <= '5') {
+        e.preventDefault();
+        var tabs = document.querySelectorAll('.tab-btn');
+        var idx = parseInt(e.key) - 1;
+        if (tabs[idx]) tabs[idx].click();
+      }
+    });
+  }
+
+  // ─── MODEL SELECTOR ─────────────────────────────────────────────────────
+  function setupModelSelector() {
+    document.querySelectorAll('.model-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('.model-btn').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        state.currentModel = btn.dataset.model;
+        if (window.HailMaryModels) window.HailMaryModels.setActiveModel(state.currentModel);
+        saveSettings();
+      });
+    });
+  }
+
+  // ─── CHAT PANEL ──────────────────────────────────────────────────────────
+  function setupChat() {
+    el('chatSendBtn').addEventListener('click', handleChatSend);
+    el('chatInput').addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') handleChatSend();
+    });
+  }
+
+  async function handleChatSend() {
+    if (state.chatBusy || !window.HailMaryModels) return;
+    var msg = el('chatInput').value.trim();
+    if (!msg) { toast('Type a message first'); return; }
+
+    state.chatBusy = true;
+    el('chatSendBtn').disabled = true;
+    C.setText('chatSendLbl', 'THINKING...');
+    hide('chatErr');
+    appendChatMsg('user', msg, state.currentModel);
+    el('chatInput').value = '';
+    show('typing');
+
+    try {
+      var resp = await window.HailMaryModels.send(msg, state.currentModel);
+      hide('typing');
+      appendChatMsg('ai', resp.content, state.currentModel, resp);
+    } catch (err) {
+      hide('typing');
+      el('chatErr').textContent = err.message;
+      show('chatErr');
+    }
+
+    state.chatBusy = false;
+    el('chatSendBtn').disabled = false;
+    C.setText('chatSendLbl', 'SEND');
+  }
+
+  function appendChatMsg(role, text, modelId, resp) {
+    var history = el('chatHistory');
+    var div = document.createElement('div');
+    div.className = 'chat-msg ' + role;
+
+    var header = '<div class="chat-msg-header">';
+    if (role === 'user') {
+      header += '<span>You</span>';
     } else {
-      el.classList.add('hidden');
+      var model = (resp && resp.model) || modelId;
+      var icon = (resp && resp.icon) || '';
+      header += '<span>' + icon + ' ' + esc(model) + '</span>';
     }
+    header += '<span>' + new Date().toLocaleTimeString() + '</span></div>';
+
+    div.innerHTML = header + '<div class="chat-msg-body">' + C.renderMarkdown(text) + '</div>';
+    history.appendChild(div);
+    history.scrollTop = history.scrollHeight;
   }
 
-  function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(() => {
-      showToast('Copied to clipboard!', 'success');
-    }).catch(() => {
-      showToast('Failed to copy', 'error');
-    });
-  }
-
-  async function insertIntoChat(text) {
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab) { showToast('No active tab found', 'error'); return; }
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ['content.js']
-      }).catch(() => { /* may already be injected */ });
-      chrome.tabs.sendMessage(tab.id, { action: 'insertPrompt', text }, (response) => {
-        if (chrome.runtime.lastError || !response?.success) {
-          showToast('Could not insert — open an AI chat first', 'error');
-        } else {
-          showToast('Inserted into chat!', 'success');
-        }
+  // ─── ENHANCE PANEL ──────────────────────────────────────────────────────
+  function setupEnhancePanel() {
+    document.querySelectorAll('.mode-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('.mode-btn').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        state.currentEnhanceMode = btn.dataset.emode;
+        saveSettings();
       });
-    } catch {
-      showToast('Could not insert — open an AI chat first', 'error');
-    }
+    });
+
+    el('depthSlider').addEventListener('input', function () {
+      C.setText('depthLbl', DEPTH_LABELS[parseInt(this.value, 10) - 1]);
+      saveSettings();
+    });
+
+    el('enhBtn').addEventListener('click', handleEnhance);
+    el('rawInput').addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') handleEnhance();
+    });
+
+    el('copyBtn').addEventListener('click', function () {
+      if (state.lastResult) { copyText(state.lastResult.enhanced); toast('Copied to clipboard!'); }
+    });
+
+    el('injectBtn').addEventListener('click', injectToPage);
+
+    el('tgInject').addEventListener('change', saveSettings);
+    el('tgSubmit').addEventListener('change', saveSettings);
   }
 
-  function sendBg(action, data) {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action, data }, resolve);
-    });
-  }
+  async function handleEnhance() {
+    if (!window.HailMaryEngine) return;
+    var raw = el('rawInput').value.trim();
+    if (!raw) { toast('Enter a prompt to enhance'); return; }
 
-  /* ── Tab Navigation ── */
-
-  $$('.tab').forEach((tab) => {
-    tab.addEventListener('click', () => {
-      $$('.tab').forEach((t) => t.classList.remove('active'));
-      $$('.tab-content').forEach((c) => c.classList.remove('active'));
-      tab.classList.add('active');
-      $(`#tab-${tab.dataset.tab}`).classList.add('active');
-    });
-  });
-
-  /* ── Settings ── */
-
-  $('#btn-settings').addEventListener('click', () => {
-    chrome.runtime.openOptionsPage();
-  });
-
-  /* ══════════════════════════════════════
-     TAB 1: OPTIMIZER
-     ══════════════════════════════════════ */
-
-  $('#btn-optimize').addEventListener('click', async () => {
-    const raw = $('#raw-prompt').value.trim();
-    if (!raw) { showToast('Enter a prompt first', 'error'); return; }
-
-    const mode = document.querySelector('input[name="opt-mode"]:checked').value;
-
-    setLoading(true, 'Optimizing with AI...');
-    $('#btn-optimize').disabled = true;
+    el('enhBtn').disabled = true;
+    C.setText('enhLbl', 'ENHANCING...');
+    hide('errBox');
 
     try {
-      const result = await sendBg('optimizePrompt', { rawPrompt: raw, mode });
+      var result = await window.HailMaryEngine.enhance(raw, state.currentEnhanceMode, null, { depth: el('depthSlider').value });
+      state.lastResult = result;
 
-      if (result.error) {
-        showToast(result.error, 'error');
-        return;
-      }
+      C.setText('outMode', FIRE_LABELS[result.mode] || result.mode);
+      C.setText('outTokens', result.stats.enhancedTokens + ' tokens');
+      C.setText('outMultiplier', result.stats.powerMultiplier + 'x');
+      C.setText('outTechniques', result.stats.techniqueCount + ' techniques');
+      el('outBox').textContent = result.enhanced;
+      show('outWrap');
 
-      const resultArea = $('#optimizer-result');
-      resultArea.classList.remove('hidden');
+      saveHistory(result);
 
-      $('#optimized-text').textContent = result.optimized || '';
+      if (el('tgInject').checked) injectToPage();
 
-      if (result.score?.before) {
-        $('#score-before').textContent = result.score.before;
-        $('#score-after').textContent = result.score.after;
-      }
-
-      if (result.breakdown && Object.keys(result.breakdown).length) {
-        $('#craft-breakdown').classList.remove('hidden');
-        $('#bd-context').textContent = result.breakdown.context || '—';
-        $('#bd-role').textContent = result.breakdown.role || '—';
-        $('#bd-action').textContent = result.breakdown.action || '—';
-        $('#bd-format').textContent = result.breakdown.format || '—';
-        $('#bd-tone').textContent = result.breakdown.tone || '—';
-      }
-
-      if (result.improvements?.length) {
-        $('#improvements-list').classList.remove('hidden');
-        const ul = $('#improvements-ul');
-        ul.innerHTML = '';
-        result.improvements.forEach((imp) => {
-          const li = document.createElement('li');
-          li.textContent = imp;
-          ul.appendChild(li);
-        });
-      }
-
-      window._lastOptimized = result.optimized || '';
+      toast((FIRE_LABELS[result.mode] || 'Enhanced') + ' | ' + result.stats.powerMultiplier + 'x power');
     } catch (err) {
-      showToast(err.message || 'Optimization failed', 'error');
-    } finally {
-      setLoading(false);
-      $('#btn-optimize').disabled = false;
+      showErr(err.message);
     }
-  });
 
-  $('#btn-copy-optimized').addEventListener('click', () => {
-    if (window._lastOptimized) copyToClipboard(window._lastOptimized);
-  });
-
-  $('#btn-insert-optimized').addEventListener('click', () => {
-    if (window._lastOptimized) insertIntoChat(window._lastOptimized);
-  });
-
-  $('#btn-save-optimized').addEventListener('click', async () => {
-    if (!window._lastOptimized) return;
-    await sendBg('saveToLibrary', {
-      title: window._lastOptimized.slice(0, 60),
-      prompt: window._lastOptimized,
-      source: 'optimizer',
-      tags: ['optimized']
-    });
-    showToast('Saved to library!', 'success');
-  });
-
-  /* ══════════════════════════════════════
-     TAB 2: CRAFT BUILDER
-     ══════════════════════════════════════ */
-
-  const TEMPLATES = [
-    { name: 'Blog Post', context: 'Writing for a company blog targeting professionals', role: 'Act as an experienced content strategist and writer', action: 'Write a well-structured blog post on the given topic', format: 'Markdown with headings, bullet points, and a conclusion', tone: 'Professional' },
-    { name: 'Code Review', context: 'Reviewing code for a production application', role: 'Act as a senior software engineer with 10+ years of experience', action: 'Review the provided code and suggest improvements', format: 'Numbered list of issues with code examples for fixes', tone: 'Technical' },
-    { name: 'Email Draft', context: 'Business communication with a client or stakeholder', role: 'Act as a professional business communicator', action: 'Draft an email based on the given requirements', format: 'Standard email format with subject line, greeting, body, and sign-off', tone: 'Professional' },
-    { name: 'Research', context: 'Conducting analysis on a specific topic', role: 'Act as a research analyst with domain expertise', action: 'Analyze the topic and provide comprehensive findings', format: 'Structured report with executive summary, key findings, and recommendations', tone: 'Academic' },
-    { name: 'Marketing', context: 'Creating marketing content for product promotion', role: 'Act as a creative marketing strategist', action: 'Create compelling marketing copy for the given product or service', format: 'Multiple variations with headlines, body copy, and call-to-action', tone: 'Persuasive' }
-  ];
-
-  function renderTemplateChips() {
-    const container = document.createElement('div');
-    container.className = 'templates-row';
-    TEMPLATES.forEach((tmpl) => {
-      const chip = document.createElement('button');
-      chip.className = 'template-chip';
-      chip.textContent = tmpl.name;
-      chip.addEventListener('click', () => {
-        $('#craft-context').value = tmpl.context;
-        $('#craft-role').value = tmpl.role;
-        $('#craft-action').value = tmpl.action;
-        $('#craft-format').value = tmpl.format;
-        $('#craft-tone').value = tmpl.tone;
-      });
-      container.appendChild(chip);
-    });
-    const builderTab = $('#tab-builder');
-    builderTab.insertBefore(container, builderTab.querySelector('.form-group'));
-  }
-  renderTemplateChips();
-
-  $('#btn-build-craft').addEventListener('click', () => {
-    const ctx = $('#craft-context').value.trim();
-    const role = $('#craft-role').value.trim();
-    const action = $('#craft-action').value.trim();
-    const fmt = $('#craft-format').value.trim();
-    const tone = $('#craft-tone').value;
-
-    if (!action) { showToast('At least fill in the Action field', 'error'); return; }
-
-    const parts = [];
-    if (role) parts.push(role + '.');
-    if (ctx) parts.push('\n\nContext: ' + ctx);
-    parts.push('\n\nTask: ' + action);
-    if (fmt) parts.push('\n\nFormat: ' + fmt);
-    if (tone) parts.push('\n\nTone: ' + tone);
-
-    const built = parts.join('');
-    window._lastBuilt = built;
-
-    $('#built-text').textContent = built;
-    $('#builder-result').classList.remove('hidden');
-  });
-
-  $('#btn-copy-built').addEventListener('click', () => {
-    if (window._lastBuilt) copyToClipboard(window._lastBuilt);
-  });
-
-  $('#btn-insert-built').addEventListener('click', () => {
-    if (window._lastBuilt) insertIntoChat(window._lastBuilt);
-  });
-
-  $('#btn-save-built').addEventListener('click', async () => {
-    if (!window._lastBuilt) return;
-    await sendBg('saveToLibrary', {
-      title: window._lastBuilt.slice(0, 60),
-      prompt: window._lastBuilt,
-      source: 'builder',
-      tags: ['craft']
-    });
-    showToast('Saved to library!', 'success');
-  });
-
-  /* ══════════════════════════════════════
-     TAB 3: GUIDED MODE (Juma-style)
-     ══════════════════════════════════════ */
-
-  let guidedStep = 'start';
-  let guidedAnswers = {};
-
-  function renderGuidedQuestions(questions) {
-    const container = $('#guided-questions');
-    container.innerHTML = '';
-
-    questions.forEach((q) => {
-      const group = document.createElement('div');
-      group.className = 'form-group';
-
-      const label = document.createElement('label');
-      label.textContent = q.label;
-      label.setAttribute('for', 'guided-' + q.id);
-      group.appendChild(label);
-
-      if (q.type === 'textarea') {
-        const ta = document.createElement('textarea');
-        ta.id = 'guided-' + q.id;
-        ta.rows = 2;
-        ta.placeholder = q.placeholder || '';
-        ta.dataset.qid = q.id;
-        group.appendChild(ta);
-      } else if (q.type === 'select' && q.options) {
-        const sel = document.createElement('select');
-        sel.id = 'guided-' + q.id;
-        sel.dataset.qid = q.id;
-        const defOpt = document.createElement('option');
-        defOpt.value = '';
-        defOpt.textContent = q.placeholder || 'Select...';
-        sel.appendChild(defOpt);
-        q.options.forEach((opt) => {
-          const o = document.createElement('option');
-          o.value = opt;
-          o.textContent = opt;
-          sel.appendChild(o);
-        });
-        group.appendChild(sel);
-      } else {
-        const inp = document.createElement('input');
-        inp.type = 'text';
-        inp.id = 'guided-' + q.id;
-        inp.placeholder = q.placeholder || '';
-        inp.dataset.qid = q.id;
-        group.appendChild(inp);
-      }
-
-      container.appendChild(group);
-    });
+    el('enhBtn').disabled = false;
+    C.setText('enhLbl', '\u26a1 ENHANCE');
   }
 
-  function collectGuidedAnswers() {
-    const inputs = $$('#guided-questions [data-qid]');
-    inputs.forEach((el) => {
-      const val = el.value.trim();
-      if (val) guidedAnswers[el.dataset.qid] = val;
-    });
-  }
+  async function injectToPage() {
+    if (!state.lastResult) return;
+    var tab = await C.getActiveTab();
+    if (!tab || !tab.id) { toast('No active tab'); return; }
 
-  function updateStepIndicator(step) {
-    const stepMap = { start: 1, basic: 2, details: 3 };
-    const current = stepMap[step] || 1;
-    $$('.step-dot').forEach((dot) => {
-      const s = parseInt(dot.dataset.step, 10);
-      dot.classList.remove('active', 'completed');
-      if (s < current) dot.classList.add('completed');
-      if (s === current) dot.classList.add('active');
-    });
-    $$('.step-line').forEach((line, i) => {
-      line.classList.toggle('active', i < current - 1);
-    });
-  }
-
-  async function startGuided() {
-    guidedStep = 'start';
-    guidedAnswers = {};
-    $('#guided-result').classList.add('hidden');
-    $('#guided-container').classList.remove('hidden');
-    updateStepIndicator('start');
-
-    const result = await sendBg('guidedBuild', { step: 'start', answers: {} });
-    guidedStep = result.step;
-    updateStepIndicator(guidedStep);
-    renderGuidedQuestions(result.questions);
-    $('#btn-guided-next').textContent = 'Next Step';
-  }
-
-  startGuided();
-
-  $('#btn-guided-next').addEventListener('click', async () => {
-    collectGuidedAnswers();
-
-    if (guidedStep === 'basic') {
-      updateStepIndicator('details');
-      setLoading(true, 'Building your prompt...');
-    }
+    var enhanced = state.lastResult.enhanced;
+    var autoSubmit = el('tgSubmit').checked;
 
     try {
-      const result = await sendBg('guidedBuild', { step: guidedStep, answers: guidedAnswers });
-
-      if (result.error) {
-        showToast(result.error, 'error');
-        return;
-      }
-
-      if (result.step === 'complete') {
-        $('#guided-container').classList.add('hidden');
-        const resultArea = $('#guided-result');
-        resultArea.classList.remove('hidden');
-
-        window._lastGuided = result.prompt || '';
-        $('#guided-text').textContent = result.prompt || '';
-
-        if (result.tips?.length) {
-          $('#guided-tips').classList.remove('hidden');
-          const ul = $('#guided-tips-ul');
-          ul.innerHTML = '';
-          result.tips.forEach((tip) => {
-            const li = document.createElement('li');
-            li.textContent = tip;
-            ul.appendChild(li);
-          });
+      await C.executeOnTab(tab.id, function (text, submit, selectors) {
+        for (var i = 0; i < selectors.length; i++) {
+          var el = document.querySelector(selectors[i]);
+          if (el) {
+            if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') el.value = text;
+            else el.textContent = text;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            if (submit) {
+              var form = el.closest('form');
+              if (form) { var btn = form.querySelector('button[type="submit"],button:not([type])'); if (btn) btn.click(); }
+              else el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+            }
+            return { success: true };
+          }
         }
-      } else {
-        guidedStep = result.step;
-        updateStepIndicator(guidedStep);
-        renderGuidedQuestions(result.questions);
-
-        if (guidedStep === 'details') {
-          const btn = $('#btn-guided-next');
-          btn.innerHTML = 'Generate Prompt <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
-        }
-      }
-    } catch (err) {
-      showToast(err.message || 'Failed', 'error');
-    } finally {
-      setLoading(false);
+        return { success: false, error: 'No input field found' };
+      }, [enhanced, autoSubmit, C.INPUT_SELECTORS]);
+      toast('Injected into page!');
+    } catch (e) {
+      toast('Injection failed: ' + e.message);
     }
-  });
+  }
 
-  $('#btn-copy-guided').addEventListener('click', () => {
-    if (window._lastGuided) copyToClipboard(window._lastGuided);
-  });
+  // ─── TOOLS PANEL ─────────────────────────────────────────────────────────
+  function setupToolsPanel() {
+    var grid = el('toolsGrid');
+    if (!window.HailMaryTools) return;
 
-  $('#btn-insert-guided').addEventListener('click', () => {
-    if (window._lastGuided) insertIntoChat(window._lastGuided);
-  });
-
-  $('#btn-save-guided').addEventListener('click', async () => {
-    if (!window._lastGuided) return;
-    await sendBg('saveToLibrary', {
-      title: window._lastGuided.slice(0, 60),
-      prompt: window._lastGuided,
-      source: 'guided',
-      tags: ['guided']
+    var tools = window.HailMaryTools.getRegistry();
+    tools.forEach(function (toolName) {
+      var btn = document.createElement('button');
+      btn.className = 'tool-btn';
+      btn.textContent = toolName.replace(/_/g, ' ');
+      btn.dataset.tool = toolName;
+      btn.setAttribute('role', 'option');
+      grid.appendChild(btn);
     });
-    showToast('Saved to library!', 'success');
-  });
 
-  $('#btn-guided-restart').addEventListener('click', () => {
-    startGuided();
-  });
+    grid.addEventListener('click', function (e) {
+      var btn = e.target.closest('.tool-btn');
+      if (!btn) return;
+      document.querySelectorAll('.tool-btn').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.currentTool = btn.dataset.tool;
+      renderToolInputs(state.currentTool);
+      el('toolRunBtn').disabled = false;
+      C.setText('toolRunLbl', 'RUN ' + state.currentTool.toUpperCase().replace(/_/g, ' '));
+    });
 
-  /* ══════════════════════════════════════
-     TAB 4: LIBRARY
-     ══════════════════════════════════════ */
+    el('toolRunBtn').addEventListener('click', handleToolRun);
 
-  let currentFilter = 'all';
+    el('toolOutputCopy').addEventListener('click', function () {
+      copyText(el('toolOutputBox').textContent);
+      toast('Output copied!');
+    });
 
-  function renderLibrary(items) {
-    const container = $('#library-list');
+    el('toolLogHdr').addEventListener('click', function () {
+      var list = el('toolLogList');
+      list.style.display = list.style.display === 'none' ? 'block' : 'none';
+    });
+  }
 
-    if (!items.length) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          <p>No saved prompts yet.</p>
-          <p class="hint">Optimize or build a prompt, then save it here.</p>
-        </div>`;
+  function renderToolInputs(toolName) {
+    var inputs = TOOL_INPUTS[toolName] || [];
+    var container = el('toolRunnerInputs');
+    C.setText('toolRunnerLabel', 'Tool Runner \u2014 ' + toolName);
+
+    if (inputs.length === 0) {
+      container.innerHTML = '<div class="tool-placeholder">No inputs needed. Hit run!</div>';
       return;
     }
 
-    container.innerHTML = '';
-    items.forEach((item) => {
-      const div = document.createElement('div');
-      div.className = 'library-item';
-      div.innerHTML = `
-        <div class="library-item-header">
-          <div class="library-item-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
-          <div class="library-item-actions">
-            <button class="lib-fav ${item.favorite ? 'favorited' : ''}" data-id="${item.id}" title="Toggle favorite">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="${item.favorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-            </button>
-            <button class="lib-copy" data-prompt="${escapeAttr(item.prompt)}" title="Copy">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            </button>
-            <button class="lib-insert" data-prompt="${escapeAttr(item.prompt)}" title="Insert into chat">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            </button>
-            <button class="lib-delete" data-id="${item.id}" title="Delete">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
-          </div>
-        </div>
-        <div class="library-item-preview">${escapeHtml(item.prompt)}</div>
-        <div class="library-item-meta">
-          <span class="library-item-tag">${item.source || 'manual'}</span>
-          <span>${timeAgo(item.createdAt)}</span>
-        </div>`;
-      container.appendChild(div);
+    container.innerHTML = inputs.map(function (inp) {
+      if (inp.type === 'textarea') {
+        return '<textarea class="tool-input" data-name="' + inp.name + '" placeholder="' + esc(inp.placeholder) + '" rows="3"></textarea>';
+      }
+      return '<input class="tool-input" data-name="' + inp.name + '" placeholder="' + esc(inp.placeholder) + '" type="text">';
+    }).join('');
+  }
+
+  async function handleToolRun() {
+    if (!state.currentTool || !window.HailMaryTools) return;
+
+    el('toolRunBtn').disabled = true;
+    C.setText('toolRunLbl', 'RUNNING...');
+
+    var inputEls = document.querySelectorAll('#toolRunnerInputs .tool-input');
+    var args = {};
+    inputEls.forEach(function (inp) {
+      var name = inp.dataset.name;
+      var val = inp.value.trim();
+      if (val) {
+        try { args[name] = JSON.parse(val); } catch (e) { args[name] = val; }
+      }
     });
 
-    container.querySelectorAll('.lib-fav').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        await sendBg('toggleFavorite', { id: btn.dataset.id });
-        loadLibrary();
+    try {
+      var result = await window.HailMaryTools.executeTool(state.currentTool, args);
+      el('toolOutputBox').textContent = JSON.stringify(result, null, 2);
+      show('toolOutput');
+      updateToolLog(state.currentTool, result);
+      toast(result.success ? state.currentTool + ' succeeded' : state.currentTool + ' failed');
+    } catch (err) {
+      el('toolOutputBox').textContent = JSON.stringify({ error: err.message }, null, 2);
+      show('toolOutput');
+      toast('Error: ' + err.message);
+    }
+
+    el('toolRunBtn').disabled = false;
+    C.setText('toolRunLbl', 'RUN ' + state.currentTool.toUpperCase().replace(/_/g, ' '));
+  }
+
+  function updateToolLog(tool, result) {
+    var log = window.HailMaryTools ? window.HailMaryTools.getLog() : [];
+    C.setText('toolLogCount', log.length);
+
+    var list = el('toolLogList');
+    var time = new Date().toLocaleTimeString();
+    var status = result && result.success ? '\u2705' : '\u274c';
+    var item = document.createElement('div');
+    item.className = 'tool-log-item';
+    item.innerHTML = '<span class="tl-time">' + time + '</span>' +
+      '<span class="tl-tool">' + status + ' ' + esc(tool) + '</span>' +
+      '<span>' + esc(JSON.stringify(result).slice(0, 80)) + '</span>';
+    list.insertBefore(item, list.firstChild);
+  }
+
+  function updateToolCount() {
+    if (window.HailMaryTools) C.setText('toolCount', window.HailMaryTools.getToolCount());
+  }
+
+  // ─── TURNS PANEL ─────────────────────────────────────────────────────────
+  function setupTurnsPanel() {
+    document.querySelectorAll('.turns-count-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('.turns-count-btn').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        state.currentTurns = parseInt(btn.dataset.turns, 10);
       });
     });
 
-    container.querySelectorAll('.lib-copy').forEach((btn) => {
-      btn.addEventListener('click', () => copyToClipboard(btn.dataset.prompt));
+    el('turnsBtn').addEventListener('click', handleTurns);
+    el('turnsInput').addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') handleTurns();
     });
 
-    container.querySelectorAll('.lib-insert').forEach((btn) => {
-      btn.addEventListener('click', () => insertIntoChat(btn.dataset.prompt));
+    el('turnsCopyAllBtn').addEventListener('click', function () {
+      if (!state.lastTurns) return;
+      var all = state.lastTurns.turns.map(function (t) {
+        return '\u2500\u2500 TURN ' + t.number + ' (' + t.phase.toUpperCase() + ') \u2500\u2500\n\n' + t.text;
+      }).join('\n\n' + '\u2500'.repeat(50) + '\n\n');
+      copyText(all);
+      toast('All turns copied!');
     });
 
-    container.querySelectorAll('.lib-delete').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        await sendBg('deleteFromLibrary', { id: btn.dataset.id });
-        showToast('Deleted', 'success');
-        loadLibrary();
-      });
+    el('turnsClearBtn').addEventListener('click', function () {
+      hide('turnsOutWrap');
+      state.lastTurns = null;
     });
   }
 
-  async function loadLibrary() {
-    const items = await sendBg('getLibrary');
-    const search = $('#library-search').value.toLowerCase().trim();
+  function handleTurns() {
+    if (!window.HailMaryEngine) return;
+    var raw = el('turnsInput').value.trim();
+    if (!raw) { toast('Enter a topic first'); return; }
 
-    let filtered = items || [];
-    if (currentFilter === 'favorites') {
-      filtered = filtered.filter((i) => i.favorite);
+    el('turnsBtn').disabled = true;
+    C.setText('turnsLbl', 'GENERATING...');
+
+    window.HailMaryEngine.generateTurns(raw, state.currentTurns).then(function (result) {
+      state.lastTurns = result;
+      renderTurns(result);
+      show('turnsOutWrap');
+      toast(result.count + ' turns generated!');
+      el('turnsBtn').disabled = false;
+      C.setText('turnsLbl', 'GENERATE TURNS');
+    }).catch(function (err) {
+      toast('Error: ' + err.message);
+      el('turnsBtn').disabled = false;
+      C.setText('turnsLbl', 'GENERATE TURNS');
+    });
+  }
+
+  function renderTurns(result) {
+    C.setText('turnsOutTitle', result.count + ' Turns \u00b7 ' + result.topic.slice(0, 30));
+    var list = el('turnsList');
+    list.innerHTML = '';
+
+    result.turns.forEach(function (turn) {
+      var item = document.createElement('div');
+      item.className = 'turn-item';
+      item.setAttribute('role', 'listitem');
+
+      var header = document.createElement('div');
+      header.className = 'turn-header';
+      header.innerHTML =
+        '<span class="turn-num">Turn ' + turn.number + '</span>' +
+        '<span class="turn-phase">' + esc(turn.phase) + '</span>' +
+        '<button class="turn-copy-btn" data-turn="' + turn.number + '">\u{1f4cb}</button>';
+
+      var preview = document.createElement('div');
+      preview.className = 'turn-preview';
+      preview.textContent = turn.text.slice(0, 90) + '\u2026';
+
+      var body = document.createElement('div');
+      body.className = 'turn-body';
+      body.textContent = turn.text;
+
+      header.addEventListener('click', function (e) {
+        if (e.target.classList.contains('turn-copy-btn')) return;
+        body.classList.toggle('open');
+        preview.style.display = body.classList.contains('open') ? 'none' : '';
+      });
+
+      header.querySelector('.turn-copy-btn').addEventListener('click', function (e) {
+        e.stopPropagation();
+        copyText(turn.text);
+        toast('Turn ' + turn.number + ' copied!');
+      });
+
+      item.appendChild(header);
+      item.appendChild(preview);
+      item.appendChild(body);
+      list.appendChild(item);
+    });
+  }
+
+  // ─── SETTINGS PANEL ─────────────────────────────────────────────────────
+  function setupSettingsPanel() {
+    el('kbRefreshBtn').addEventListener('click', function () {
+      C.sendMsg({ type: 'FETCH_KNOWLEDGE_NOW' }).then(function (resp) {
+        toast('Knowledge refreshed: ' + ((resp && resp.totalCount) || 0) + ' techniques');
+        refreshSettingsStats();
+      });
+    });
+
+    el('clearHistBtn').addEventListener('click', function () {
+      C.storageSet({ hm_hist: [] }).then(function () {
+        refreshHistory();
+        toast('History cleared');
+      });
+    });
+
+    el('clearChatBtn').addEventListener('click', function () {
+      el('chatHistory').innerHTML = '';
+      if (window.HailMaryModels) window.HailMaryModels.clearHistory();
+      toast('Chat cleared');
+    });
+
+    el('exportBtn').addEventListener('click', function () {
+      C.storageGet(['hm_v6', 'hm_hist', 'hm_knowledge']).then(function (data) {
+        var json = JSON.stringify(data, null, 2);
+        var blob = new Blob([json], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = 'hailmary-export-' + Date.now() + '.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        toast('Settings exported');
+      });
+    });
+
+    refreshSettingsStats();
+  }
+
+  function refreshSettingsStats() {
+    C.sendMsg({ type: 'GET_STATUS' }).then(function (resp) {
+      if (resp) {
+        C.setText('kbStatus', 'Techniques: ' + (resp.techniqueCount || 0) + ' | Fetches: ' + (resp.fetchCount || 0));
+      }
+    });
+
+    if (window.HailMaryEngine) {
+      var ks = window.HailMaryEngine.getKnowledgeStatus();
+      C.setText('siLevel', 'Level: ' + (ks.sessionIntelligence || 1).toFixed(2));
+      C.setText('siCount', 'Enhancements: ' + (ks.enhancementCount || 0));
+      C.setText('siMeta', 'Meta-learning patterns: ' + (ks.metaLearningPatterns || 0));
     }
-    if (search) {
-      filtered = filtered.filter((i) =>
-        (i.title || '').toLowerCase().includes(search) ||
-        (i.prompt || '').toLowerCase().includes(search)
+
+    if (window.HailMaryModels) {
+      var ms = window.HailMaryModels.getStats();
+      C.setHTML('modelStatsBox',
+        'Requests: ' + ms.totalRequests + '<br>' +
+        'Success rate: ' + ms.successRate + '<br>' +
+        'Active: ' + ms.activeModel + '<br>' +
+        'Sessions: ' + ms.historySize
       );
     }
-    renderLibrary(filtered);
   }
 
-  $$('.filter-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      $$('.filter-btn').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentFilter = btn.dataset.filter;
-      loadLibrary();
+  // ─── HISTORY ─────────────────────────────────────────────────────────────
+  function setupHistory() {
+    el('histHdr').addEventListener('click', function () {
+      var list = el('histList');
+      list.style.display = list.style.display === 'none' ? 'block' : 'none';
     });
-  });
+    refreshHistory();
+  }
 
-  $('#library-search').addEventListener('input', () => {
-    loadLibrary();
-  });
-
-  /* Load library when Library tab is clicked */
-  $$('.tab').forEach((tab) => {
-    tab.addEventListener('click', () => {
-      if (tab.dataset.tab === 'library') loadLibrary();
+  function saveHistory(result) {
+    C.storageGet('hm_hist').then(function (data) {
+      var hist = (data && data.hm_hist) || [];
+      hist.unshift({
+        raw: result.original, enhanced: result.enhanced, mode: result.mode,
+        task: result.analysis.task, ts: new Date().toLocaleTimeString()
+      });
+      if (hist.length > state.MAX_HIST) hist = hist.slice(0, state.MAX_HIST);
+      C.storageSet({ hm_hist: hist });
     });
-  });
-
-  /* ── Helpers ── */
-
-  function escapeHtml(str) {
-    const d = document.createElement('div');
-    d.textContent = str || '';
-    return d.innerHTML;
   }
 
-  function escapeAttr(str) {
-    return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  function refreshHistory() {
+    C.storageGet('hm_hist').then(function (data) {
+      var hist = (data && data.hm_hist) || [];
+      C.setText('histCount', hist.length);
+      var list = el('histList');
+      list.innerHTML = '';
+      if (hist.length === 0) {
+        list.innerHTML = '<div style="padding:10px;color:#64748b;font-size:11px;text-align:center">No history yet</div>';
+        return;
+      }
+      hist.forEach(function (item) {
+        var div = document.createElement('div');
+        div.className = 'hist-item';
+        div.innerHTML = '<div class="hi-raw">' + esc(item.raw) + '</div>' +
+          '<div class="hi-meta"><span class="hi-mode">' + esc(item.mode || '') + '</span>' +
+          '<span>' + esc(item.task || '') + '</span><span>' + esc(item.ts || '') + '</span></div>';
+        div.addEventListener('click', function () {
+          el('rawInput').value = item.raw;
+          el('outBox').textContent = item.enhanced;
+          show('outWrap');
+          state.lastResult = { enhanced: item.enhanced, original: item.raw };
+          list.style.display = 'none';
+          // Switch to enhance panel
+          document.querySelector('[data-panel="enhancePanel"]').click();
+        });
+        list.appendChild(div);
+      });
+    });
   }
 
-  function timeAgo(iso) {
-    if (!iso) return '';
-    const diff = Date.now() - new Date(iso).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return mins + 'm ago';
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return hrs + 'h ago';
-    const days = Math.floor(hrs / 24);
-    return days + 'd ago';
+  // ─── TAB STATUS ──────────────────────────────────────────────────────────
+  function checkTab() {
+    C.getActiveTab().then(function (tab) {
+      if (!tab) return;
+      var isAI = C.isAISite(tab.url || '');
+      var dot = el('statusDot');
+      dot.classList.toggle('on', isAI);
+      dot.classList.toggle('warn', !isAI);
+      dot.title = isAI ? 'Connected \u2014 will inject directly' : 'Not on a supported AI page';
+    });
   }
-})();
+
+  // ─── CONTEXT MENU TEXT ───────────────────────────────────────────────────
+  function loadContextMenuText() {
+    C.storageGet('hm_context_text').then(function (data) {
+      if (data && data.hm_context_text) {
+        el('rawInput').value = data.hm_context_text;
+        C.storageSet({ hm_context_text: '' });
+        document.querySelector('[data-panel="enhancePanel"]').click();
+      }
+    });
+  }
+
+  // ─── SETTINGS PERSISTENCE ───────────────────────────────────────────────
+  function saveSettings() {
+    C.storageSet({
+      hm_v6: {
+        model: state.currentModel,
+        emode: state.currentEnhanceMode,
+        depth: el('depthSlider').value,
+        inject: el('tgInject').checked,
+        submit: el('tgSubmit').checked,
+        turns: state.currentTurns
+      }
+    });
+  }
+
+  function loadSettings() {
+    C.storageGet('hm_v6').then(function (data) {
+      var s = data && data.hm_v6;
+      if (!s) return;
+      if (s.model) {
+        state.currentModel = s.model;
+        document.querySelectorAll('.model-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.model === s.model); });
+      }
+      if (s.emode) {
+        state.currentEnhanceMode = s.emode;
+        document.querySelectorAll('.mode-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.emode === s.emode); });
+      }
+      if (s.depth) {
+        el('depthSlider').value = s.depth;
+        C.setText('depthLbl', DEPTH_LABELS[parseInt(s.depth, 10) - 1]);
+      }
+      if (s.inject !== undefined) el('tgInject').checked = s.inject;
+      if (s.submit !== undefined) el('tgSubmit').checked = s.submit;
+      if (s.turns) {
+        state.currentTurns = s.turns;
+        document.querySelectorAll('.turns-count-btn').forEach(function (b) { b.classList.toggle('active', parseInt(b.dataset.turns, 10) === s.turns); });
+      }
+    });
+  }
+
+  // ─── UTILS ───────────────────────────────────────────────────────────────
+  function showErr(msg) { el('errBox').textContent = msg; show('errBox'); }
+
+}());
