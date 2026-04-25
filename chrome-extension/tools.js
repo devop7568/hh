@@ -535,12 +535,60 @@ window.HailMaryTools = (function () {
     alarm_manage: alarm_manage, window_manage: window_manage
   };
 
+  // Maps tool names to their argument schema: [positional_arg_name, ..., options_object_fields]
+  // The last entry (if an array) collects remaining fields into an options object.
+  var TOOL_ARGS = {
+    browser_navigate: ['url', ['newTab']],
+    click: ['selector'],
+    fill_form: ['fields'],
+    extract_data: ['config'],
+    dom_query: ['selector', ['limit']],
+    input_simulate: ['selector', 'text', ['clear', 'submit']],
+    tab_manage: ['action', ['tabId', 'url']],
+    element_modify: ['selector', 'modifications'],
+    style_modify: ['selector', 'styles'],
+    script_inject: ['code'],
+    event_dispatch: ['selector', 'eventType', ['bubbles', 'key', 'code']],
+    shell_exec: ['command', ['cwd', 'timeout']],
+    file_read: ['path', ['encoding']],
+    file_write: ['path', 'content', ['append']],
+    download_file: ['url', 'filename'],
+    web_search: ['query', ['engine', 'limit']],
+    api_call: ['url', ['method', 'headers', 'body', 'timeout']],
+    storage_read: ['keys'],
+    storage_write: ['data'],
+    cookie_read: ['url', 'name'],
+    cookie_write: ['details'],
+    clipboard_access: ['action', 'text'],
+    screenshot: [['format', 'quality']],
+    page_wait: ['ms'],
+    notification_send: ['title', 'message', ['iconUrl']],
+    bookmark_manage: ['action', ['title', 'url', 'parentId', 'query', 'id', 'limit']],
+    history_search: ['query', ['limit', 'startTime']],
+    alarm_manage: ['action', ['name', 'delay', 'period']],
+    window_manage: ['action', ['url', 'type', 'width', 'height', 'windowId']]
+  };
+
   async function executeTool(toolName, args) {
     var fn = TOOL_REGISTRY[toolName];
     if (!fn) return fail('Unknown tool: ' + toolName);
     try {
       if (Array.isArray(args)) return await fn.apply(null, args);
       if (typeof args === 'object' && args !== null) {
+        var schema = TOOL_ARGS[toolName];
+        if (schema) {
+          var positional = [];
+          for (var i = 0; i < schema.length; i++) {
+            if (Array.isArray(schema[i])) {
+              var opts = {};
+              schema[i].forEach(function (field) { if (args[field] !== undefined) opts[field] = args[field]; });
+              positional.push(opts);
+            } else {
+              positional.push(args[schema[i]]);
+            }
+          }
+          return await fn.apply(null, positional);
+        }
         var keys = Object.keys(args);
         return await fn.apply(null, keys.map(function (k) { return args[k]; }));
       }

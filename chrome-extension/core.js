@@ -131,7 +131,7 @@ window.HailMaryCore = (function () {
       .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="lang-$1">$2</code></pre>')
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+      .replace(/\[([^\]]+)\]\(([^)"]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
       .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
       .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
       .replace(/^---$/gm, '<hr>')

@@ -9,7 +9,7 @@
   var AI_SITES = [
     'chatgpt.com', 'openai.com', 'claude.ai', 'gemini.google.com',
     'perplexity.ai', 'poe.com', 'grok.com', 'you.com', 'copilot.microsoft.com',
-    'deepseek.com', 'chat.mistral.ai', 'huggingface.co/chat', 'pi.ai',
+    'deepseek.com', 'chat.mistral.ai', 'huggingface.co', 'pi.ai',
     'labs.google', 'aistudio.google.com'
   ];
 
