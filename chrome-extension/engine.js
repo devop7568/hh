@@ -456,11 +456,10 @@ window.HailMaryEngine = (function () {
 
     if (a.wc < 5 || a.amb >= 2) {
       result = enhanceVaguePrompt(a);
-    } else if (depth >= 3) {
-      result = selectBrain(a, depth);
     } else {
       var builders = { manus: buildManus, juma: buildJuma, openmanus: buildOpenManus };
       result = (builders[mode] || buildHailMary)(a);
+      if (depth >= 3) result += '\n\n' + selectBrain(a, depth);
     }
 
     if (depth >= 3 && k && k.techniques && k.techniques.length > 0) {

@@ -132,6 +132,7 @@
     state.chatBusy = true;
     el('chatSendBtn').disabled = true;
     C.setText('chatSendLbl', 'THINKING...');
+    hide('chatErr');
     appendChatMsg('user', msg, state.currentModel);
     el('chatInput').value = '';
     show('typing');
@@ -209,6 +210,7 @@
 
     el('enhBtn').disabled = true;
     C.setText('enhLbl', 'ENHANCING...');
+    hide('errBox');
 
     try {
       var result = await window.HailMaryEngine.enhance(raw, state.currentEnhanceMode, null, { depth: el('depthSlider').value });

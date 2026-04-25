@@ -108,11 +108,11 @@ var MESSAGE_HANDLERS = {
   },
 
   RECORD_ENHANCEMENT: function (msg, respond) {
-    recordEnhancement(msg.data).then(function () { respond({ ok: true }); });
+    recordEnhancement(msg.data).then(function () { respond({ ok: true }); }).catch(function (err) { respond({ error: err.message }); });
   },
 
   FETCH_KNOWLEDGE_NOW: function (msg, respond) {
-    fetchKnowledge().then(respond);
+    fetchKnowledge().then(respond).catch(function (err) { respond({ error: err.message }); });
   },
 
   GET_STATUS: function (msg, respond) {
