@@ -1,49 +1,56 @@
 {
   "manifest_version": 3,
-  "name": "PromptForge AI",
-  "version": "1.0.0",
-  "description": "All-in-one AI prompt engineering extension combining Manus AI structured prompting, Juma guided building, and PromptCraft optimization into one powerful tool.",
-  "permissions": ["storage", "activeTab", "scripting"],
-  "host_permissions": [
-    "https://chat.openai.com/*",
-    "https://chatgpt.com/*",
-    "https://claude.ai/*",
-    "https://gemini.google.com/*",
-    "https://copilot.microsoft.com/*",
-    "https://poe.com/*",
-    "https://api.openai.com/*",
-    "https://api.anthropic.com/*",
-    "https://openrouter.ai/*"
+  "name": "HailMary — Autonomous Agent Suite",
+  "version": "6.0.0",
+  "description": "Autonomous AI agent suite with multi-model brain, prompt engineering, browser automation, and 29-tool orchestrator. Zero API keys required.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "clipboardWrite",
+    "clipboardRead",
+    "alarms",
+    "tabs",
+    "webNavigation",
+    "debugger",
+    "nativeMessaging",
+    "downloads",
+    "cookies",
+    "contextMenus"
   ],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html",
+    "default_title": "HailMary Agent Suite v6.0",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "background": {
-    "service_worker": "background.js"
-  },
-  "content_scripts": [
+  "web_accessible_resources": [
     {
-      "matches": [
-        "https://chat.openai.com/*",
-        "https://chatgpt.com/*",
-        "https://claude.ai/*",
-        "https://gemini.google.com/*",
-        "https://copilot.microsoft.com/*",
-        "https://poe.com/*"
-      ],
-      "js": ["content.js"],
-      "css": ["content.css"]
+      "resources": ["core.js", "tools.js", "models.js", "engine.js"],
+      "matches": ["<all_urls>"]
     }
-  ],
-  "options_page": "options.html"
+  ]
 }
