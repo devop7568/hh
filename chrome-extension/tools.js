@@ -283,7 +283,8 @@ window.HailMaryTools = (function () {
     if (!tabs.length) return fail('No active tab');
     var results = await chrome.scripting.executeScript({
       target: { tabId: tabs[0].id },
-      func: new Function('return (function(){ ' + code + ' })()')
+      func: function (codeStr) { return new Function(codeStr)(); },
+      args: [code]
     });
     var r = (results && results[0] && results[0].result);
     log('script_inject', { codeLength: code.length }, { hasResult: r !== undefined });

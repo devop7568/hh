@@ -35,13 +35,12 @@ window.HailMaryEngine = (function () {
   var kCache = null;
 
   function loadKnowledge(cb) {
-    if (kCache) return cb(kCache, null);
     try {
       chrome.runtime.sendMessage({ type: 'GET_KNOWLEDGE' }, function (resp) {
         if (resp && resp.knowledge) { kCache = resp.knowledge; cb(kCache, resp.memory); }
-        else cb({ techniques: [] }, null);
+        else cb(kCache || { techniques: [] }, null);
       });
-    } catch (e) { cb({ techniques: [] }, null); }
+    } catch (e) { cb(kCache || { techniques: [] }, null); }
   }
 
   function record(data) {
@@ -564,7 +563,8 @@ window.HailMaryEngine = (function () {
           resolve(buildResult(raw, enhanced, mode, mode === 'auto', techniques, a, qualityScore, origW, enhW, techCount, depth, t0, k));
         })
         .catch(function () {
-          resolve(run(raw, mode, opts || {}, k));
+          var pre = { depth: depth, t0: t0, a: a, resolvedMode: mode };
+          resolve(run(raw, mode, opts || {}, k, pre));
         });
     });
   }
