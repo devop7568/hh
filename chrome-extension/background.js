@@ -205,7 +205,6 @@ async function fetchKnowledge() {
   };
 
   await new Promise(function (res) { chrome.storage.local.set({ hm_knowledge: newKnowledge }, res); });
-  setTimeout(fetchKnowledge, FETCH_INTERVAL_MS);
 
   return { ok: true, newCount: deduped.length, totalCount: merged.length, results: fetchResults };
 }

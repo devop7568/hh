@@ -144,7 +144,7 @@
       var relevant = knowledge.techniques.slice(0, 3);
       enhanced += '\nApply these prompting techniques:\n';
       relevant.forEach(function (t) {
-        enhanced += '- ' + (t.name || t) + (t.description ? ': ' + t.description : '') + '\n';
+        enhanced += '- ' + (t.name || t) + (t.instruction ? ': ' + t.instruction : '') + '\n';
       });
     }
 
