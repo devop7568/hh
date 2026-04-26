@@ -607,9 +607,9 @@
 
           div.addEventListener('click', function () {
             el('rawInput').value = item.raw;
-            el('outBox').textContent = item.enhanced;
+            lastResult = { enhanced: item.enhanced, original: item.raw, techniques: [], analysis: { task: item.task, domains: [], complexity: 'medium' }, stats: { originalTokens: 0, enhancedTokens: 0, powerMultiplier: '0', techniqueCount: 0, duration: 0, knowledgeUsed: 0 }, mode: item.mode || 'hailmary' };
+            renderOutput(lastResult);
             show('outWrap');
-            lastResult = { enhanced: item.enhanced, original: item.raw, techniques: [], analysis: { task: item.task, domains: [], complexity: 'medium' }, stats: { originalTokens: 0, enhancedTokens: 0, powerMultiplier: '0', techniqueCount: 0, duration: 0, knowledgeUsed: 0 } };
             list.style.display = 'none';
             toast('Loaded from history');
           });
