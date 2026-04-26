@@ -1,49 +1,37 @@
 {
   "manifest_version": 3,
-  "name": "PromptForge AI",
-  "version": "1.0.0",
-  "description": "All-in-one AI prompt engineering extension combining Manus AI structured prompting, Juma guided building, and PromptCraft optimization into one powerful tool.",
-  "permissions": ["storage", "activeTab", "scripting"],
+  "name": "HailMary — Autonomous Prompt Enhancer",
+  "version": "4.0.0",
+  "description": "Autonomous prompt enhancement engine. Weaves expert techniques into clean, copy-paste-ready prompts. Learns from web-sourced knowledge.",
+  "permissions": ["activeTab", "scripting", "storage", "clipboardWrite", "clipboardRead", "alarms"],
   "host_permissions": [
     "https://chat.openai.com/*",
     "https://chatgpt.com/*",
     "https://claude.ai/*",
     "https://gemini.google.com/*",
-    "https://copilot.microsoft.com/*",
+    "https://www.perplexity.ai/*",
     "https://poe.com/*",
-    "https://api.openai.com/*",
-    "https://api.anthropic.com/*",
-    "https://openrouter.ai/*"
+    "https://grok.com/*",
+    "https://you.com/*"
   ],
-  "action": {
-    "default_popup": "popup.html",
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    }
-  },
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "HailMary" },
+  "content_scripts": [{
+    "matches": [
+      "https://chat.openai.com/*",
+      "https://chatgpt.com/*",
+      "https://claude.ai/*",
+      "https://gemini.google.com/*",
+      "https://www.perplexity.ai/*",
+      "https://poe.com/*",
+      "https://grok.com/*"
+    ],
+    "js": ["content.js"],
+    "run_at": "document_idle"
+  }],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  },
-  "background": {
-    "service_worker": "background.js"
-  },
-  "content_scripts": [
-    {
-      "matches": [
-        "https://chat.openai.com/*",
-        "https://chatgpt.com/*",
-        "https://claude.ai/*",
-        "https://gemini.google.com/*",
-        "https://copilot.microsoft.com/*",
-        "https://poe.com/*"
-      ],
-      "js": ["content.js"],
-      "css": ["content.css"]
-    }
-  ],
-  "options_page": "options.html"
+  }
 }
