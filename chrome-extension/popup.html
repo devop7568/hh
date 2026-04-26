@@ -1,238 +1,146 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PromptForge AI</title>
-  <link rel="stylesheet" href="popup.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>HailMary</title>
+  <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div id="app">
-    <!-- Header -->
-    <header class="header">
-      <div class="header-left">
-        <div class="logo">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <rect width="24" height="24" rx="6" fill="url(#grad)" />
-            <path d="M7 8h10M7 12h7M7 16h10" stroke="#fff" stroke-width="2" stroke-linecap="round" />
-            <defs><linearGradient id="grad" x1="0" y1="0" x2="24" y2="24"><stop stop-color="#8b5cf6" /><stop offset="1" stop-color="#6366f1" /></linearGradient></defs>
-          </svg>
-          <span class="logo-text">PromptForge <small>AI</small></span>
-        </div>
-      </div>
-      <div class="header-right">
-        <button id="btn-settings" class="icon-btn" title="Settings">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </button>
-      </div>
-    </header>
+<div id="app">
 
-    <!-- Navigation Tabs -->
-    <nav class="tabs">
-      <button class="tab active" data-tab="optimizer">Optimizer</button>
-      <button class="tab" data-tab="builder">CRAFT Builder</button>
-      <button class="tab" data-tab="guided">Guided</button>
-      <button class="tab" data-tab="library">Library</button>
-    </nav>
-
-    <!-- Tab: Optimizer (Manus + PromptCraft style) -->
-    <section id="tab-optimizer" class="tab-content active">
-      <div class="section-desc">Paste a rough prompt and let AI optimize it using Manus + CRAFT + Juma frameworks.</div>
-      <div class="form-group">
-        <label for="raw-prompt">Your Raw Prompt</label>
-        <textarea id="raw-prompt" rows="4" placeholder="e.g., Write me a blog post about AI trends"></textarea>
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="logo">
+      <span class="logo-ico">☄️</span>
+      <div>
+        <div class="logo-name">HailMary</div>
+        <div class="logo-sub">Autonomous Prompt Enhancer v4.0</div>
       </div>
-      <div class="form-group">
-        <label>Optimization Depth</label>
-        <div class="radio-group">
-          <label class="radio-label"><input type="radio" name="opt-mode" value="quick" checked /> Quick</label>
-          <label class="radio-label"><input type="radio" name="opt-mode" value="standard" /> Standard</label>
-          <label class="radio-label"><input type="radio" name="opt-mode" value="deep" /> Deep</label>
-        </div>
-      </div>
-      <button id="btn-optimize" class="btn-primary">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        Optimize Prompt
-      </button>
-
-      <div id="optimizer-result" class="result-area hidden">
-        <div class="result-header">
-          <h3>Optimized Prompt</h3>
-          <div class="score-badge">
-            <span id="score-before" class="score-val">-</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-            <span id="score-after" class="score-val highlight">-</span>
-          </div>
-        </div>
-        <div id="optimized-text" class="result-text"></div>
-
-        <div id="craft-breakdown" class="breakdown hidden">
-          <h4>CRAFT Breakdown</h4>
-          <div class="breakdown-grid">
-            <div class="breakdown-item"><span class="breakdown-label">Context</span><span id="bd-context" class="breakdown-val"></span></div>
-            <div class="breakdown-item"><span class="breakdown-label">Role</span><span id="bd-role" class="breakdown-val"></span></div>
-            <div class="breakdown-item"><span class="breakdown-label">Action</span><span id="bd-action" class="breakdown-val"></span></div>
-            <div class="breakdown-item"><span class="breakdown-label">Format</span><span id="bd-format" class="breakdown-val"></span></div>
-            <div class="breakdown-item"><span class="breakdown-label">Tone</span><span id="bd-tone" class="breakdown-val"></span></div>
-          </div>
-        </div>
-
-        <div id="improvements-list" class="improvements hidden">
-          <h4>Improvements Made</h4>
-          <ul id="improvements-ul"></ul>
-        </div>
-
-        <div class="result-actions">
-          <button id="btn-copy-optimized" class="btn-secondary" title="Copy to clipboard">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            Copy
-          </button>
-          <button id="btn-insert-optimized" class="btn-secondary" title="Insert into active AI chat">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            Insert
-          </button>
-          <button id="btn-save-optimized" class="btn-secondary" title="Save to library">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            Save
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- Tab: CRAFT Builder (Manual structured builder) -->
-    <section id="tab-builder" class="tab-content">
-      <div class="section-desc">Build a prompt manually using the CRAFT framework fields.</div>
-      <div class="form-group">
-        <label for="craft-context">Context <span class="hint">Background & situation</span></label>
-        <textarea id="craft-context" rows="2" placeholder="e.g., I'm a startup founder preparing for a Series A pitch..."></textarea>
-      </div>
-      <div class="form-group">
-        <label for="craft-role">Role <span class="hint">AI persona & expertise</span></label>
-        <input id="craft-role" type="text" placeholder="e.g., Act as a seasoned venture capital advisor" />
-      </div>
-      <div class="form-group">
-        <label for="craft-action">Action <span class="hint">Specific task to perform</span></label>
-        <textarea id="craft-action" rows="2" placeholder="e.g., Review my pitch deck outline and suggest improvements..."></textarea>
-      </div>
-      <div class="form-group">
-        <label for="craft-format">Format <span class="hint">Output structure</span></label>
-        <input id="craft-format" type="text" placeholder="e.g., Numbered list with priority ratings (High/Medium/Low)" />
-      </div>
-      <div class="form-group">
-        <label for="craft-tone">Tone <span class="hint">Communication style</span></label>
-        <select id="craft-tone">
-          <option value="">Select tone...</option>
-          <option value="Professional">Professional</option>
-          <option value="Casual">Casual</option>
-          <option value="Technical">Technical</option>
-          <option value="Friendly">Friendly</option>
-          <option value="Formal">Formal</option>
-          <option value="Persuasive">Persuasive</option>
-          <option value="Academic">Academic</option>
-          <option value="Creative">Creative</option>
-          <option value="Concise">Concise</option>
-          <option value="Direct">Direct</option>
-        </select>
-      </div>
-      <button id="btn-build-craft" class="btn-primary">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-        Build Prompt
-      </button>
-
-      <div id="builder-result" class="result-area hidden">
-        <h3>Generated Prompt</h3>
-        <div id="built-text" class="result-text"></div>
-        <div class="result-actions">
-          <button id="btn-copy-built" class="btn-secondary">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            Copy
-          </button>
-          <button id="btn-insert-built" class="btn-secondary">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            Insert
-          </button>
-          <button id="btn-save-built" class="btn-secondary">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            Save
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- Tab: Guided (Juma-style step-by-step) -->
-    <section id="tab-guided" class="tab-content">
-      <div class="section-desc">Answer a few quick questions and get a perfectly crafted prompt — no expertise needed.</div>
-      <div id="guided-container">
-        <div id="guided-step-indicator" class="step-indicator">
-          <div class="step-dot active" data-step="1">1</div>
-          <div class="step-line"></div>
-          <div class="step-dot" data-step="2">2</div>
-          <div class="step-line"></div>
-          <div class="step-dot" data-step="3">3</div>
-        </div>
-        <div id="guided-questions"></div>
-        <button id="btn-guided-next" class="btn-primary">
-          Next Step
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </button>
-      </div>
-
-      <div id="guided-result" class="result-area hidden">
-        <h3>Your Crafted Prompt</h3>
-        <div id="guided-text" class="result-text"></div>
-        <div id="guided-tips" class="tips hidden">
-          <h4>Usage Tips</h4>
-          <ul id="guided-tips-ul"></ul>
-        </div>
-        <div class="result-actions">
-          <button id="btn-copy-guided" class="btn-secondary">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            Copy
-          </button>
-          <button id="btn-insert-guided" class="btn-secondary">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            Insert
-          </button>
-          <button id="btn-save-guided" class="btn-secondary">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            Save
-          </button>
-          <button id="btn-guided-restart" class="btn-secondary">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-            Start Over
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- Tab: Library -->
-    <section id="tab-library" class="tab-content">
-      <div class="library-header">
-        <input id="library-search" type="text" placeholder="Search saved prompts..." />
-        <div class="library-filter">
-          <button class="filter-btn active" data-filter="all">All</button>
-          <button class="filter-btn" data-filter="favorites">Favorites</button>
-        </div>
-      </div>
-      <div id="library-list" class="library-list">
-        <div class="empty-state">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          <p>No saved prompts yet.</p>
-          <p class="hint">Optimize or build a prompt, then save it here.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Loading overlay -->
-    <div id="loading" class="loading hidden">
-      <div class="spinner"></div>
-      <span>Optimizing with AI...</span>
     </div>
-
-    <!-- Toast notifications -->
-    <div id="toast" class="toast hidden"></div>
+    <div class="status-dot" id="statusDot" title="Checking page..."></div>
   </div>
 
-  <script src="popup.js"></script>
+  <!-- MODE TABS -->
+  <div class="tabs">
+    <button class="tab active" data-mode="hailmary">☄️ Hail Mary</button>
+    <button class="tab" data-mode="manus">🧠 Manus</button>
+    <button class="tab" data-mode="juma">⚡ Juma</button>
+    <button class="tab" data-mode="auto">🤖 Auto</button>
+    <button class="tab" data-mode="turns">🔄 Turns</button>
+  </div>
+
+  <!-- INPUT (standard modes) -->
+  <div id="standardPanel">
+  <div class="section">
+    <label class="lbl">Raw Prompt</label>
+    <textarea id="rawInput" rows="5" placeholder="Type your raw prompt here. HailMary will analyze it and apply the best prompting techniques automatically..."></textarea>
+    <div class="shortcut-hint">Ctrl+Enter to enhance</div>
+
+    <label class="lbl mt8">Depth</label>
+    <div class="depth-row">
+      <input type="range" id="depthSlider" min="1" max="5" value="4">
+      <span id="depthLbl" class="depth-lbl">ULTRA</span>
+    </div>
+
+    <div class="toggles">
+      <label class="tog"><input type="checkbox" id="tgInject" checked><span class="tog-track"></span><span>Auto-Inject</span></label>
+      <label class="tog"><input type="checkbox" id="tgSubmit"><span class="tog-track"></span><span>Auto-Submit</span></label>
+    </div>
+  </div>
+
+  <!-- BUTTON -->
+  <button id="fireBtn" class="fire-btn">
+    <span class="fire-ico">☄️</span>
+    <span id="fireLbl">FIRE HAIL MARY</span>
+    <span id="loadingSpinner" class="spinner" style="display:none"></span>
+  </button>
+  </div>
+
+  <!-- TURNS PANEL -->
+  <div id="turnsPanel" style="display:none">
+  <div class="section">
+    <label class="lbl">Topic or Goal</label>
+    <textarea id="turnsInput" rows="4" placeholder="Describe what you want to learn or accomplish. e.g. 'Python subprocess module for server automation' or 'how to raise a seed round'..."></textarea>
+    <div class="shortcut-hint">Ctrl+Enter to generate</div>
+
+    <label class="lbl mt8">Number of Turns</label>
+    <div class="turns-count-row">
+      <button class="turns-count-btn active" data-turns="6">6 Turns</button>
+      <button class="turns-count-btn" data-turns="8">8 Turns</button>
+      <button class="turns-count-btn" data-turns="10">10 Turns</button>
+    </div>
+    <div class="turns-hint">Each turn is a complete, copy-paste-ready message that builds on the last — escalating from basics to expert-level in a single conversation arc.</div>
+  </div>
+
+  <button id="turnsBtn" class="fire-btn turns-fire-btn">
+    <span class="fire-ico">🔄</span>
+    <span id="turnsLbl">GENERATE TURNS</span>
+  </button>
+  </div>
+
+  <!-- ERROR -->
+  <div id="errBox" class="err-box" style="display:none"></div>
+
+  <!-- OUTPUT (standard) -->
+  <div id="outWrap" class="out-wrap" style="display:none">
+    <div class="out-hdr">
+      <span class="lbl">Enhanced Prompt</span>
+      <div class="out-acts">
+        <button id="copyBtn" class="act-btn" title="Copy to clipboard">Copy</button>
+        <button id="injectBtn" class="act-btn" title="Inject to AI tab">Inject</button>
+        <button id="clearBtn" class="act-btn" title="Clear output">Clear</button>
+      </div>
+    </div>
+    <div id="tagRow" class="tag-row"></div>
+    <div id="outBox" class="out-box"></div>
+    <div id="statsBar" class="stats-bar"></div>
+  </div>
+
+  <!-- OUTPUT (turns) -->
+  <div id="turnsOutWrap" style="display:none">
+    <div class="turns-out-hdr">
+      <span class="lbl" id="turnsOutTitle">8 Turns Generated</span>
+      <div class="out-acts">
+        <button id="turnsCopyAllBtn" class="act-btn" title="Copy all turns">Copy All</button>
+        <button id="turnsClearBtn" class="act-btn" title="Clear">Clear</button>
+      </div>
+    </div>
+    <div id="turnsList" class="turns-list"></div>
+  </div>
+
+  <!-- HISTORY TOGGLE -->
+  <div class="hist-hdr" id="histHdr">
+    <span>History</span><span id="histCount" class="badge">0</span>
+  </div>
+  <div id="histList" class="hist-list" style="display:none"></div>
+
+  <!-- SETTINGS TOGGLE -->
+  <div class="settings-hdr" id="settingsHdr">
+    <span>Settings &amp; Data</span>
+  </div>
+  <div id="settingsPanel" class="settings-panel" style="display:none">
+    <div class="settings-row">
+      <div class="settings-section">
+        <div class="settings-label">Knowledge Base</div>
+        <div id="knowledgeStatus" class="settings-info">Checking...</div>
+        <button id="refreshKnBtn" class="settings-btn">Refresh Knowledge</button>
+      </div>
+      <div class="settings-section">
+        <div class="settings-label">Data Management</div>
+        <div class="settings-btn-row">
+          <button id="exportBtn" class="settings-btn">Export Backup</button>
+          <button id="importBtn" class="settings-btn">Import Backup</button>
+          <input type="file" id="importFile" accept=".json" style="display:none">
+        </div>
+        <button id="clearHistBtn" class="settings-btn settings-btn-danger">Clear History</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">HailMary v4.0 — Autonomous Prompt Enhancer</div>
+</div>
+<script src="engine.js"></script>
+<script src="popup.js"></script>
 </body>
 </html>
