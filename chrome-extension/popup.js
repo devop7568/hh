@@ -44,6 +44,14 @@
     checkTab();
     renderKnowledgeStatus();
 
+    // Load captured text from content script floating button
+    chrome.storage.local.get('hm_captured', function (data) {
+      if (data && data.hm_captured) {
+        el('rawInput').value = data.hm_captured;
+        chrome.storage.local.remove('hm_captured');
+      }
+    });
+
     // Mode tabs
     document.querySelectorAll('.tab').forEach(function (btn) {
       btn.addEventListener('click', function () {
