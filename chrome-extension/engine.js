@@ -415,29 +415,21 @@ window.HailMaryEngine = (function () {
   }
 
   // ── BRAIN SELECTOR ───────────────────────────────────────────────────────────
-  // Routes to appropriate reasoning engine based on task and depth
-  function selectBrain(a, depth, mode) {
+  // Selects a reasoning brain based on task/complexity, used to augment mode output
+  function selectBrain(a, depth) {
     var hash = Math.abs(parseInt(a.fp, 36) || 0);
-    
-    // For high complexity or depth 5, use DeepSeek V3 (most powerful)
+
     if (a.complexity === 'high' || depth >= 5) {
       return buildDeepSeekBrain(a, depth);
     }
-    
-    // For code and strategy tasks, prefer ChatGPT o1 (best at planning)
-    if ((a.task === 'code' || a.task === 'strategy') && depth >= 3) {
+    if (a.task === 'code' || a.task === 'strategy') {
       return buildChatGPTO1Brain(a, depth);
     }
-    
-    // For research and analysis, prefer Claude (best at nuance)
-    if ((a.task === 'research' || a.task === 'analysis') && depth >= 3) {
+    if (a.task === 'research' || a.task === 'analysis') {
       return buildClaudeBrain(a, depth);
     }
-    
-    // Otherwise rotate based on fingerprint
     var brains = [buildDeepSeekBrain, buildChatGPTO1Brain, buildClaudeBrain];
-    var brainFn = brains[hash % 3];
-    return brainFn(a, depth);
+    return brains[hash % 3](a, depth);
   }
   // Each mode picks a different role variant based on task+domain+prompt fingerprint
   // so the same prompt always gets the same role, but different prompts get variety
@@ -683,18 +675,20 @@ window.HailMaryEngine = (function () {
 
   // ── PROMPT BUILDER ───────────────────────────────────────────────────────────
   function buildPrompt(a, depth, mode, k) {
+    // Always use the user-selected mode so tabs produce distinct output
     var result;
-
-    if (depth >= 3) {
-      result = selectBrain(a, depth, mode);
+    if (mode === 'manus') {
+      result = buildManus(a, depth);
+    } else if (mode === 'juma') {
+      result = buildJuma(a, depth);
     } else {
-      if (mode === 'manus') {
-        result = buildManus(a, depth);
-      } else if (mode === 'juma') {
-        result = buildJuma(a, depth);
-      } else {
-        result = buildHailMary(a, depth);
-      }
+      result = buildHailMary(a, depth);
+    }
+
+    // At depth 3+, augment with brain-level deep reasoning scaffold
+    if (depth >= 3) {
+      var brainLayer = selectBrain(a, depth);
+      result += '\n\n── DEEP REASONING ──\n' + brainLayer;
     }
 
     // Append format directive (was defined but never wired up)
