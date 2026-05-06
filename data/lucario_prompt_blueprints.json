@@ -1,0 +1,42 @@
+{
+  "name": "Lucario Fusion Blueprints",
+  "version": "1.0.0",
+  "blueprints": [
+    {
+      "model": "PromptCraft",
+      "focusCategory": "backend-api",
+      "keywords": ["api", "service", "endpoint", "backend", "schema"],
+      "directive": "Force Context→Role→Action→Constraints→Format layout with measurable acceptance criteria."
+    },
+    {
+      "model": "PromptCraft",
+      "focusCategory": "frontend-ui",
+      "keywords": ["ui", "component", "dashboard", "design", "accessibility"],
+      "directive": "Declare state matrix, UI behaviors, and strict output format before implementation details."
+    },
+    {
+      "model": "Juma",
+      "focusCategory": "product-strategy",
+      "keywords": ["strategy", "roadmap", "launch", "market", "persona"],
+      "directive": "Begin with a concise planning dialogue and alternatives table, then converge to a final plan."
+    },
+    {
+      "model": "Juma",
+      "focusCategory": "devops",
+      "keywords": ["cicd", "pipeline", "deploy", "ops", "infra"],
+      "directive": "Use stage-by-stage execution with explicit assumptions, risks, and mitigation tracks."
+    },
+    {
+      "model": "OpenManus",
+      "focusCategory": "agent-orchestration",
+      "keywords": ["agent", "automation", "workflow", "multi-agent", "orchestration"],
+      "directive": "Run plan→act→reflect loops with checkpoints, self-critique, and quality gates."
+    },
+    {
+      "model": "OpenManus",
+      "focusCategory": "mlops",
+      "keywords": ["model", "mlops", "monitoring", "evaluation", "rollback"],
+      "directive": "Require observability, rollback criteria, and verification metrics before final delivery."
+    }
+  ]
+}
