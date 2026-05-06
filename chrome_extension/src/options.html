@@ -30,6 +30,12 @@
       <label for="constraints">Global constraints (one per line)</label>
       <textarea id="constraints" rows="8" placeholder="Always include edge cases\nPrefer secure defaults\nReturn structured JSON"></textarea>
 
+      <label for="agentMaxIterations">Agent max iterations</label>
+      <input id="agentMaxIterations" type="number" min="1" max="10" value="3" />
+
+      <label for="agentMinScoreDelta">Agent min score delta</label>
+      <input id="agentMinScoreDelta" type="number" min="0.01" max="0.5" step="0.01" value="0.05" />
+
       <div class="buttons">
         <button id="save">Save</button>
         <button id="train" class="secondary">Run Training</button>

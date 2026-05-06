@@ -33,6 +33,7 @@ A full extension has been added under `chrome_extension/`:
 - `src/popup.html|css|js` (prompt enhancement UI)
 - `src/options.html|css|js` (settings + training controls)
 - `src/engine.js` (browser-side enhancement engine)
+- `src/agent.js` (autonomous iterative prompt-improvement agent loop)
 - `data/*.chrome.json` (training + blueprint datasets)
 
 ### 3) Local training + blueprint datasets
@@ -61,7 +62,7 @@ Then use popup, options page, or right-click selected text with:
 ### Popup flow
 1. Paste rough prompt
 2. Choose profile + output type
-3. Click **Enhance Prompt**
+3. Click **Enhance Prompt** or **Run Autonomous Agent**
 4. Copy enhanced output
 
 ### Context menu flow

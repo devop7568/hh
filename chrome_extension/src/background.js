@@ -1,4 +1,5 @@
 import { enhancePrompt, trainModel } from './engine.js';
+import { runAutonomousAgent } from './agent.js';
 
 const STATE_KEY = 'prompting_pro_state_v3';
 let cachedData = null;
@@ -118,6 +119,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
 
+    if (message.type === 'PROMPTING_PRO_AGENT_RUN') {
+      const agentResult = runAutonomousAgent({
+        rawPrompt: message.payload.rawPrompt,
+        workspace: message.payload.workspace,
+        trainingData,
+        blueprintData,
+        playbookData,
+        trained: state.trained,
+        config: {
+          maxIterations: message.payload.maxIterations || state.agentMaxIterations || 3,
+          minScoreDelta: message.payload.minScoreDelta || state.agentMinScoreDelta || 0.05,
+          profile: message.payload.profile || state.defaultProfile || 'lucario',
+          outputType: message.payload.outputType || state.defaultOutputType || 'prompt'
+        }
+      });
+
+      state.lastAgentRun = {
+        at: new Date().toISOString(),
+        prompt: message.payload.rawPrompt.slice(0, 200),
+        bestIteration: agentResult.bestIteration,
+        traceLength: agentResult.trace.length,
+        score: agentResult.finalMetrics.score
+      };
+      await saveState(state);
+      sendResponse({ ok: true, result: agentResult });
+      return;
+    }
+
     if (message.type === 'PROMPTING_PRO_TRAIN') {
       state.trained = trainModel(trainingData);
       state.lastTraining = state.trained.trainedAt;
@@ -135,6 +164,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       state.defaultProfile = message.payload.defaultProfile;
       state.defaultOutputType = message.payload.defaultOutputType;
       state.globalConstraints = message.payload.globalConstraints || [];
+      state.agentMaxIterations = message.payload.agentMaxIterations || state.agentMaxIterations || 3;
+      state.agentMinScoreDelta = message.payload.agentMinScoreDelta || state.agentMinScoreDelta || 0.05;
       await saveState(state);
       sendResponse({ ok: true, state });
       return;

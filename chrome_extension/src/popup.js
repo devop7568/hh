@@ -5,6 +5,7 @@ const el = {
   result: document.getElementById('result'),
   status: document.getElementById('status'),
   enhance: document.getElementById('enhance'),
+  runAgent: document.getElementById('runAgent'),
   train: document.getElementById('train'),
   copy: document.getElementById('copy'),
   openOptions: document.getElementById('openOptions')
@@ -81,6 +82,38 @@ el.train.addEventListener('click', () => {
     }
     setStatus(`Trained at ${response.trained.trainedAt}`);
   });
+});
+
+el.runAgent.addEventListener('click', async () => {
+  const rawPrompt = el.rawPrompt.value.trim();
+  if (!rawPrompt) {
+    setStatus('Paste a prompt first.');
+    return;
+  }
+
+  setStatus('Running autonomous agent...');
+  const workspace = await getCurrentTabContext();
+
+  chrome.runtime.sendMessage(
+    {
+      type: 'PROMPTING_PRO_AGENT_RUN',
+      payload: {
+        rawPrompt,
+        profile: el.profile.value,
+        outputType: el.outputType.value,
+        workspace
+      }
+    },
+    (response) => {
+      if (!response?.ok) {
+        setStatus(response?.error || 'Agent run failed.');
+        return;
+      }
+      const agentResult = response.result;
+      el.result.value = agentResult.final?.enhancedPrompt || '';
+      setStatus(`Agent done • best iter ${agentResult.bestIteration} • score ${agentResult.finalMetrics.score}`);
+    }
+  );
 });
 
 el.copy.addEventListener('click', async () => {
